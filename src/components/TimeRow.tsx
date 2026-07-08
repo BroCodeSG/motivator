@@ -78,12 +78,11 @@ export function TimeRow({
           mode="time"
           is24Hour
           value={new Date(2000, 0, 1, time.hour, time.minute)}
-          onChange={(event, date) => {
+          onValueChange={(event, date) => {
             setPickerOpen(false);
-            if (event.type === 'set' && date) {
-              onChange({ ...time, hour: date.getHours(), minute: date.getMinutes() });
-            }
+            onChange({ ...time, hour: date.getHours(), minute: date.getMinutes() });
           }}
+          onDismiss={() => setPickerOpen(false)}
         />
       )}
     </View>

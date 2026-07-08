@@ -14,6 +14,8 @@
 //   node scripts/manage.mjs remove-item <page> <textOrIndex>
 //   node scripts/manage.mjs check <page> <textOrIndex>
 //   node scripts/manage.mjs uncheck <page> <textOrIndex>
+//   node scripts/manage.mjs tag <page> <tag> [more tags...]
+//   node scripts/manage.mjs untag <page> <tag>
 //   node scripts/manage.mjs set-times <page> "<times>"
 //       daily:   "08:00,12:30,18:00"
 //       weekly:  "mon@08:00,fri@17:00"
@@ -151,7 +153,8 @@ function printPage(doc) {
   const head = p.type === 'reminder' && p.reminder
     ? `[reminder, ${p.reminder.interval}: ${p.reminder.times.map((t) => fmtTime(p.reminder.interval, t)).join(', ') || 'no times'}]`
     : '[list]';
-  console.log(`${p.title || 'Untitled'} ${head} (${p.color}, id ${doc.id})`);
+  const tags = (p.tags ?? []).length > 0 ? ` ${p.tags.map((t) => `#${t}`).join(' ')}` : '';
+  console.log(`${p.title || 'Untitled'} ${head}${tags} (${p.color}, id ${doc.id})`);
   (p.items ?? []).forEach((i, n) => {
     console.log(`  ${n + 1}. ${p.type === 'reminder' ? (i.checked ? '[x] ' : '[ ] ') : ''}${i.text}`);
   });
@@ -213,6 +216,7 @@ switch (cmd) {
       color,
       position,
       items: [],
+      tags: [],
       reminder: type === 'reminder' ? { interval, times: [] } : null,
       lastResetPeriodKey: type === 'reminder' ? currentPeriodKey(interval) : '',
       createdAt: FieldValue.serverTimestamp(),
@@ -258,6 +262,20 @@ switch (cmd) {
     items[idx] = { ...items[idx], checked: cmd === 'check' };
     await updateItems(doc, items);
     console.log(`${cmd === 'check' ? 'Checked' : 'Unchecked'} "${items[idx].text}"`);
+    break;
+  }
+
+  case 'tag':
+  case 'untag': {
+    const doc = await findPage(argv[0]);
+    const given = argv.slice(1).map((t) => t.trim().toLowerCase().replace(/^#/, '')).filter(Boolean);
+    if (given.length === 0) { console.error(`Usage: ${cmd} <page> <tag> [more...]`); process.exit(1); }
+    const current = doc.data().tags ?? [];
+    const tags = cmd === 'tag'
+      ? [...new Set([...current, ...given])]
+      : current.filter((t) => !given.includes(t));
+    await doc.ref.update({ tags, updatedAt: FieldValue.serverTimestamp() });
+    console.log(`"${doc.data().title}" tags: ${tags.map((t) => `#${t}`).join(' ') || '(none)'}`);
     break;
   }
 

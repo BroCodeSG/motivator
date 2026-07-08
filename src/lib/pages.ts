@@ -37,6 +37,7 @@ function docToPage(id: string, data: any): Page {
     color: data.color ?? 'yellow',
     position: data.position ?? 0,
     items: Array.isArray(data.items) ? data.items : [],
+    tags: Array.isArray(data.tags) ? data.tags : [],
     reminder: data.reminder ?? null,
     lastResetPeriodKey: data.lastResetPeriodKey ?? '',
   };
@@ -83,6 +84,7 @@ export async function createPage(opts: {
     color: opts.color,
     position: opts.position,
     items: [],
+    tags: [],
     reminder,
     lastResetPeriodKey: reminder ? currentPeriodKey(reminder.interval, new Date()) : '',
     createdAt: serverTimestamp(),
@@ -102,6 +104,7 @@ async function update(id: string, fields: Record<string, unknown>): Promise<void
 export const setTitle = (id: string, title: string) => update(id, { title });
 export const setColor = (id: string, color: string) => update(id, { color });
 export const setItems = (id: string, items: Item[]) => update(id, { items });
+export const setTags = (id: string, tags: string[]) => update(id, { tags });
 
 export const setReminder = (id: string, reminder: ReminderConfig, lastResetPeriodKey: string) =>
   update(id, { reminder, lastResetPeriodKey });

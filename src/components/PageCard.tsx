@@ -37,6 +37,11 @@ export function PageCard({
           {page.reminder.times.length > 0 ? ` ×${page.reminder.times.length}` : ' (no times set)'}
         </Text>
       )}
+      {page.tags.length > 0 && (
+        <Text style={styles.tags} numberOfLines={1}>
+          {page.tags.map((t) => `#${t}`).join(' ')}
+        </Text>
+      )}
     </Pressable>
   );
 }
@@ -56,4 +61,5 @@ const styles = StyleSheet.create({
   checked: { textDecorationLine: 'line-through', color: UI.textMuted },
   more: { fontSize: 12, color: UI.textMuted, marginTop: 2 },
   badge: { fontSize: 12, color: UI.textMuted, marginTop: 8 },
+  tags: { fontSize: 11, color: UI.textMuted, marginTop: 4 },
 });

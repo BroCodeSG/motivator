@@ -27,6 +27,7 @@ export interface Page {
   color: string;
   position: number;
   items: Item[];
+  tags: string[];
   reminder: ReminderConfig | null;
   lastResetPeriodKey: string;
 }

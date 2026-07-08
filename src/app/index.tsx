@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FAB } from '@/components/FAB';
 import { PageCard } from '@/components/PageCard';
@@ -21,6 +21,10 @@ export default function HomeScreen() {
   const router = useRouter();
   const [debugVisible, setDebugVisible] = useState(false);
   const [count, setCount] = useState<number | null>(null);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+
+  const allTags = [...new Set(pages.flatMap((p) => p.tags))].sort();
+  const visiblePages = activeTag ? pages.filter((p) => p.tags.includes(activeTag)) : pages;
 
   const openDebug = async () => {
     setDebugVisible(true);
@@ -65,15 +69,36 @@ export default function HomeScreen() {
           ),
         }}
       />
-      {pages.length === 0 ? (
+      {allTags.length > 0 && (
+        <View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagBar}>
+            <Pressable
+              style={[styles.tagChip, activeTag === null && styles.tagChipActive]}
+              onPress={() => setActiveTag(null)}
+            >
+              <Text style={[styles.tagText, activeTag === null && styles.tagTextActive]}>All</Text>
+            </Pressable>
+            {allTags.map((tag) => (
+              <Pressable
+                key={tag}
+                style={[styles.tagChip, activeTag === tag && styles.tagChipActive]}
+                onPress={() => setActiveTag(activeTag === tag ? null : tag)}
+              >
+                <Text style={[styles.tagText, activeTag === tag && styles.tagTextActive]}>#{tag}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+      {visiblePages.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyText}>
-            {ready ? 'No pages yet.\nTap ＋ to create your first one.' : 'Loading…'}
+            {!ready ? 'Loading…' : activeTag ? `No pages tagged #${activeTag}.` : 'No pages yet.\nTap ＋ to create your first one.'}
           </Text>
         </View>
       ) : (
         <FlatList
-          data={pages}
+          data={visiblePages}
           numColumns={2}
           keyExtractor={(p) => p.id}
           contentContainerStyle={styles.grid}
@@ -116,6 +141,17 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: UI.background },
   grid: { padding: 6, paddingBottom: 100 },
+  tagBar: { paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+  tagChip: {
+    borderWidth: 1,
+    borderColor: UI.border,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  tagChipActive: { backgroundColor: UI.accent, borderColor: UI.accent },
+  tagText: { color: UI.textMuted, fontSize: 13 },
+  tagTextActive: { color: '#fff', fontWeight: '600' },
   gear: { fontSize: 20 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: UI.textMuted, fontSize: 16, textAlign: 'center', lineHeight: 24 },

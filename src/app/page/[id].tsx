@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import { ColorDots } from '@/components/ColorDots';
+import { TagEditor } from '@/components/TagEditor';
 import { TimeRow } from '@/components/TimeRow';
 import {
   addItem,
@@ -19,6 +20,7 @@ import {
   setColor,
   setItemText,
   setReminder,
+  setTags,
   setTitle,
   toggleItem,
 } from '@/lib/pages';
@@ -191,6 +193,11 @@ export default function PageDetailScreen() {
             </Text>
           </View>
         )}
+
+        <View style={styles.colorSection}>
+          <Text style={styles.sectionLabel}>Tags</Text>
+          <TagEditor tags={page.tags} onChange={(tags) => setTags(page.id, tags)} />
+        </View>
 
         <View style={styles.colorSection}>
           <Text style={styles.sectionLabel}>Color</Text>
