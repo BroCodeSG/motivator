@@ -35,6 +35,8 @@ yarn-error.*
 
 # Firebase admin credentials — never commit
 scripts/serviceAccountKey.json
+# Firebase Hosting deploy cache
+.firebase/
 # Local default account (personal ID number)
 scripts/defaultUser.txt
 # Firebase project config — points at the live database (rules are open)
