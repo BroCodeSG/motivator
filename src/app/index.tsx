@@ -2,11 +2,14 @@ import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import * as Notifications from 'expo-notifications';
-
 import { FAB } from '@/components/FAB';
 import { PageCard } from '@/components/PageCard';
-import { reconcileAll, scheduledCount } from '@/lib/notifications';
+import {
+  cancelAllNotifications,
+  notificationsAvailable,
+  reconcileAll,
+  scheduledCount,
+} from '@/lib/notifications';
 import { deletePage } from '@/lib/pages';
 import { usePages } from '@/lib/pages-context';
 import { useSession } from '@/lib/session-context';
@@ -37,7 +40,7 @@ export default function HomeScreen() {
         style: 'destructive',
         onPress: async () => {
           setDebugVisible(false);
-          await Notifications.cancelAllScheduledNotificationsAsync();
+          await cancelAllNotifications();
           logout();
         },
       },
@@ -90,7 +93,11 @@ export default function HomeScreen() {
           <View style={styles.debugCard}>
             <Text style={styles.debugTitle}>Notifications</Text>
             <Text style={styles.debugText}>
-              {count === null ? 'Counting…' : `${count} scheduled on this device`}
+              {!notificationsAvailable
+                ? 'Not available in Expo Go — reminders work in the installed app'
+                : count === null
+                  ? 'Counting…'
+                  : `${count} scheduled on this device`}
             </Text>
             <Pressable style={styles.debugButton} onPress={resync}>
               <Text style={styles.debugButtonText}>Resync now</Text>

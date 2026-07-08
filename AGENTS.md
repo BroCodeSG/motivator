@@ -34,5 +34,5 @@ node scripts/manage.mjs set-times <page> "1@08:00,15@18:00"     # monthly (day 1
 
 ## Run / build
 
-- Dev: `npx expo start` then Expo Go on the phone (local notifications DO work in Expo Go on Android).
+- Dev: `npx expo start` then Expo Go on the phone. NOTE: expo-notifications crashes on import in Expo Go on Android (SDK 53+), so src/lib/notifications.ts lazy-loads it and no-ops in Expo Go — reminders are only testable in an EAS build.
 - APK: `eas build -p android --profile preview` (free tier, ~15 builds/month).

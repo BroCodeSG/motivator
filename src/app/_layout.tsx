@@ -1,10 +1,9 @@
-import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { LoginScreen } from '@/components/LoginScreen';
-import { reconcileAll, setupNotifications } from '@/lib/notifications';
+import { addResponseListener, reconcileAll, setupNotifications } from '@/lib/notifications';
 import { PagesProvider, usePages } from '@/lib/pages-context';
 import { SessionProvider, useSession } from '@/lib/session-context';
 import { UI } from '@/theme';
@@ -34,15 +33,7 @@ function NotificationSync() {
   }, []);
 
   useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
-      const pageId = resp.notification.request.content.data?.pageId;
-      if (typeof pageId === 'string') router.push(`/page/${pageId}`);
-    });
-    Notifications.getLastNotificationResponseAsync().then((resp) => {
-      const pageId = resp?.notification.request.content.data?.pageId;
-      if (typeof pageId === 'string') router.push(`/page/${pageId}`);
-    });
-    return () => sub.remove();
+    return addResponseListener((pageId) => router.push(`/page/${pageId}`));
   }, [router]);
 
   return null;
