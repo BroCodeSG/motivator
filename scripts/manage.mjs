@@ -8,7 +8,9 @@
 //   node scripts/manage.mjs users                   # list all accounts
 //   node scripts/manage.mjs list
 //   node scripts/manage.mjs show <page>
-//   node scripts/manage.mjs add-page "<title>" [--type reminder|list] [--interval daily|weekly|monthly] [--color yellow]
+//   node scripts/manage.mjs add-page "<title>" [--type reminder|list] [--interval daily|weekly|monthly|once] [--color yellow]
+//   node scripts/manage.mjs add-once "<title>" "2026-07-15 09:00" [--color teal]
+//   node scripts/manage.mjs set-once <page> "2026-07-15 09:00"
 //   node scripts/manage.mjs remove-page <page>
 //   node scripts/manage.mjs add-item <page> "<text>" [more items...]
 //   node scripts/manage.mjs remove-item <page> <textOrIndex>
@@ -16,6 +18,7 @@
 //   node scripts/manage.mjs uncheck <page> <textOrIndex>
 //   node scripts/manage.mjs tag <page> <tag> [more tags...]
 //   node scripts/manage.mjs untag <page> <tag>
+//   node scripts/manage.mjs set-notes <page> "<paragraph text>"
 //   node scripts/manage.mjs set-times <page> "<times>"
 //       daily:   "08:00,12:30,18:00"
 //       weekly:  "mon@08:00,fri@17:00"
@@ -74,6 +77,7 @@ function pad(n) {
 
 // Mirrors src/lib/periods.ts (local time; weekly = ISO week, Monday start)
 function currentPeriodKey(interval, now = new Date()) {
+  if (interval === 'once') return '';
   if (interval === 'daily') return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   if (interval === 'monthly') return `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
   const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -141,6 +145,17 @@ function parseTimes(interval, spec) {
   });
 }
 
+// "2026-07-15 09:00" (or with T) -> "2026-07-15T09:00"; null when absent
+function parseOnceAt(spec) {
+  if (!spec) return null;
+  const m = spec.trim().replace(' ', 'T').match(/^(\d{4}-\d{2}-\d{2})T(\d{1,2}):(\d{2})$/);
+  if (!m) {
+    console.error(`Invalid date-time "${spec}" — use "yyyy-mm-dd hh:mm", e.g. "2026-07-15 09:00"`);
+    process.exit(1);
+  }
+  return `${m[1]}T${pad(Number(m[2]))}:${m[3]}`;
+}
+
 function fmtTime(interval, t) {
   const clock = `${pad(t.hour)}:${pad(t.minute)}`;
   if (interval === 'weekly') return `${WEEKDAY_NAMES[t.weekday]} ${clock}`;
@@ -151,13 +166,16 @@ function fmtTime(interval, t) {
 function printPage(doc) {
   const p = doc.data();
   const head = p.type === 'reminder' && p.reminder
-    ? `[reminder, ${p.reminder.interval}: ${p.reminder.times.map((t) => fmtTime(p.reminder.interval, t)).join(', ') || 'no times'}]`
+    ? p.reminder.interval === 'once'
+      ? `[once-off: ${p.reminder.onceAt ? p.reminder.onceAt.replace('T', ' ') : 'no date set'}]`
+      : `[reminder, ${p.reminder.interval}: ${p.reminder.times.map((t) => fmtTime(p.reminder.interval, t)).join(', ') || 'no times'}]`
     : '[list]';
   const tags = (p.tags ?? []).length > 0 ? ` ${p.tags.map((t) => `#${t}`).join(' ')}` : '';
   console.log(`${p.title || 'Untitled'} ${head}${tags} (${p.color}, id ${doc.id})`);
   (p.items ?? []).forEach((i, n) => {
     console.log(`  ${n + 1}. ${p.type === 'reminder' ? (i.checked ? '[x] ' : '[ ] ') : ''}${i.text}`);
   });
+  if (p.notes) console.log(`  note: ${p.notes}`);
 }
 
 async function updateItems(doc, items) {
@@ -205,7 +223,7 @@ switch (cmd) {
     const title = argv[0];
     if (!title) { console.error('Usage: add-page "<title>" [--type ...] [--interval ...] [--color ...]'); process.exit(1); }
     const type = flags.type === 'list' ? 'list' : 'reminder';
-    const interval = ['daily', 'weekly', 'monthly'].includes(flags.interval) ? flags.interval : 'daily';
+    const interval = ['daily', 'weekly', 'monthly', 'once'].includes(flags.interval) ? flags.interval : 'daily';
     const color = COLORS.includes(flags.color) ? flags.color : 'yellow';
     const all = await pagesCol.get();
     const position = all.docs.reduce((max, d) => Math.max(max, d.data().position ?? 0), 0) + 1;
@@ -216,8 +234,9 @@ switch (cmd) {
       color,
       position,
       items: [],
+      notes: '',
       tags: [],
-      reminder: type === 'reminder' ? { interval, times: [] } : null,
+      reminder: type === 'reminder' ? { interval, times: [], onceAt: parseOnceAt(flags.at) } : null,
       lastResetPeriodKey: type === 'reminder' ? currentPeriodKey(interval) : '',
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
@@ -276,6 +295,48 @@ switch (cmd) {
       : current.filter((t) => !given.includes(t));
     await doc.ref.update({ tags, updatedAt: FieldValue.serverTimestamp() });
     console.log(`"${doc.data().title}" tags: ${tags.map((t) => `#${t}`).join(' ') || '(none)'}`);
+    break;
+  }
+
+  case 'add-once': {
+    const [title, at] = argv;
+    if (!title || !at) { console.error('Usage: add-once "<title>" "yyyy-mm-dd hh:mm" [--color x]'); process.exit(1); }
+    const onceAt = parseOnceAt(at);
+    const all = await pagesCol.get();
+    const position = all.docs.reduce((max, d) => Math.max(max, d.data().position ?? 0), 0) + 1;
+    const id = newId();
+    await pagesCol.doc(id).set({
+      title,
+      type: 'reminder',
+      color: COLORS.includes(flags.color) ? flags.color : 'teal',
+      position,
+      items: [],
+      notes: '',
+      tags: [],
+      reminder: { interval: 'once', times: [], onceAt },
+      lastResetPeriodKey: '',
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    console.log(`Created once-off reminder "${title}" for ${onceAt.replace('T', ' ')} (id ${id})`);
+    console.log('The phone schedules it next time the app is opened.');
+    break;
+  }
+
+  case 'set-once': {
+    const doc = await findPage(argv[0]);
+    const p = doc.data();
+    if (p.reminder?.interval !== 'once') { console.error(`"${p.title}" is not a once-off reminder.`); process.exit(1); }
+    const onceAt = parseOnceAt(argv[1]);
+    await doc.ref.update({ 'reminder.onceAt': onceAt, updatedAt: FieldValue.serverTimestamp() });
+    console.log(`"${p.title}" now reminds once at ${onceAt.replace('T', ' ')}`);
+    break;
+  }
+
+  case 'set-notes': {
+    const doc = await findPage(argv[0]);
+    await doc.ref.update({ notes: argv[1] ?? '', updatedAt: FieldValue.serverTimestamp() });
+    console.log(`Updated note on "${doc.data().title}"`);
     break;
   }
 

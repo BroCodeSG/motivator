@@ -1,9 +1,18 @@
+import { format } from 'date-fns';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { pageColor, UI } from '@/theme';
 import type { Page } from '@/types';
 
-const INTERVAL_LABEL = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
+const INTERVAL_LABEL = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', once: 'Once' };
+
+function reminderBadge(page: Page): string {
+  const r = page.reminder!;
+  if (r.interval === 'once') {
+    return r.onceAt ? `🔔 ${format(new Date(r.onceAt), 'EEE d MMM HH:mm')}` : '🔔 Once (no date set)';
+  }
+  return `🔔 ${INTERVAL_LABEL[r.interval]}${r.times.length > 0 ? ` ×${r.times.length}` : ' (no times set)'}`;
+}
 
 export function PageCard({
   page,
@@ -31,11 +40,13 @@ export function PageCard({
         </Text>
       ))}
       {page.items.length > 4 && <Text style={styles.more}>+{page.items.length - 4} more</Text>}
-      {page.type === 'reminder' && page.reminder && (
-        <Text style={styles.badge}>
-          🔔 {INTERVAL_LABEL[page.reminder.interval]}
-          {page.reminder.times.length > 0 ? ` ×${page.reminder.times.length}` : ' (no times set)'}
+      {page.notes !== '' && (
+        <Text style={styles.notes} numberOfLines={2}>
+          {page.notes}
         </Text>
+      )}
+      {page.type === 'reminder' && page.reminder && (
+        <Text style={styles.badge}>{reminderBadge(page)}</Text>
       )}
       {page.tags.length > 0 && (
         <Text style={styles.tags} numberOfLines={1}>
@@ -60,6 +71,7 @@ const styles = StyleSheet.create({
   item: { fontSize: 13, color: UI.text, marginBottom: 2 },
   checked: { textDecorationLine: 'line-through', color: UI.textMuted },
   more: { fontSize: 12, color: UI.textMuted, marginTop: 2 },
+  notes: { fontSize: 12, color: UI.textMuted, marginTop: 6, fontStyle: 'italic' },
   badge: { fontSize: 12, color: UI.textMuted, marginTop: 8 },
   tags: { fontSize: 11, color: UI.textMuted, marginTop: 4 },
 });

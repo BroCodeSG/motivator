@@ -1,5 +1,5 @@
 export type PageType = 'reminder' | 'list';
-export type IntervalType = 'daily' | 'weekly' | 'monthly';
+export type IntervalType = 'daily' | 'weekly' | 'monthly' | 'once';
 
 export interface Item {
   id: string;
@@ -18,6 +18,8 @@ export interface ReminderTime {
 export interface ReminderConfig {
   interval: IntervalType;
   times: ReminderTime[];
+  // 'once' interval only: local datetime "yyyy-MM-ddTHH:mm" the single reminder fires at
+  onceAt?: string | null;
 }
 
 export interface Page {
@@ -27,6 +29,7 @@ export interface Page {
   color: string;
   position: number;
   items: Item[];
+  notes: string;
   tags: string[];
   reminder: ReminderConfig | null;
   lastResetPeriodKey: string;

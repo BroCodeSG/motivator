@@ -8,7 +8,7 @@ import { usePages } from '@/lib/pages-context';
 import { DEFAULT_COLOR, UI } from '@/theme';
 import type { IntervalType, PageType } from '@/types';
 
-const INTERVALS: IntervalType[] = ['daily', 'weekly', 'monthly'];
+const INTERVALS: IntervalType[] = ['daily', 'weekly', 'monthly', 'once'];
 
 export default function NewPageScreen() {
   const router = useRouter();

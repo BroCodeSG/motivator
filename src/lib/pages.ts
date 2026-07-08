@@ -37,6 +37,7 @@ function docToPage(id: string, data: any): Page {
     color: data.color ?? 'yellow',
     position: data.position ?? 0,
     items: Array.isArray(data.items) ? data.items : [],
+    notes: data.notes ?? '',
     tags: Array.isArray(data.tags) ? data.tags : [],
     reminder: data.reminder ?? null,
     lastResetPeriodKey: data.lastResetPeriodKey ?? '',
@@ -77,13 +78,14 @@ export async function createPage(opts: {
 }): Promise<string> {
   const id = newItemId();
   const reminder: ReminderConfig | null =
-    opts.type === 'reminder' ? { interval: opts.interval ?? 'daily', times: [] } : null;
+    opts.type === 'reminder' ? { interval: opts.interval ?? 'daily', times: [], onceAt: null } : null;
   await setDoc(doc(pagesCol(), id), {
     title: opts.title,
     type: opts.type,
     color: opts.color,
     position: opts.position,
     items: [],
+    notes: '',
     tags: [],
     reminder,
     lastResetPeriodKey: reminder ? currentPeriodKey(reminder.interval, new Date()) : '',
@@ -105,6 +107,7 @@ export const setTitle = (id: string, title: string) => update(id, { title });
 export const setColor = (id: string, color: string) => update(id, { color });
 export const setItems = (id: string, items: Item[]) => update(id, { items });
 export const setTags = (id: string, tags: string[]) => update(id, { tags });
+export const setNotes = (id: string, notes: string) => update(id, { notes });
 
 export const setReminder = (id: string, reminder: ReminderConfig, lastResetPeriodKey: string) =>
   update(id, { reminder, lastResetPeriodKey });

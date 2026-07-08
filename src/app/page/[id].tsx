@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import { ColorDots } from '@/components/ColorDots';
+import { OnceField } from '@/components/OnceField';
 import { TagEditor } from '@/components/TagEditor';
 import { TimeRow } from '@/components/TimeRow';
 import {
@@ -19,6 +20,7 @@ import {
   removeItem,
   setColor,
   setItemText,
+  setNotes,
   setReminder,
   setTags,
   setTitle,
@@ -29,7 +31,7 @@ import { currentPeriodKey } from '@/lib/periods';
 import { pageColor, UI } from '@/theme';
 import type { IntervalType, ReminderTime } from '@/types';
 
-const INTERVALS: IntervalType[] = ['daily', 'weekly', 'monthly'];
+const INTERVALS: IntervalType[] = ['daily', 'weekly', 'monthly', 'once'];
 
 function defaultTime(interval: IntervalType): ReminderTime {
   if (interval === 'weekly') return { hour: 8, minute: 0, weekday: 2 }; // Monday
@@ -42,7 +44,23 @@ export default function PageDetailScreen() {
   const page = usePage(id);
   const router = useRouter();
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
+  const [notesDraft, setNotesDraft] = useState<string | null>(null);
   const [newItem, setNewItem] = useState('');
+
+  // onEndEditing never fires on web, so commits hang off both it and onBlur;
+  // the draft-null guard makes running twice harmless.
+  const commitTitle = () => {
+    if (titleDraft !== null && titleDraft.trim() !== page?.title) {
+      setTitle(page!.id, titleDraft.trim());
+    }
+    setTitleDraft(null);
+  };
+  const commitNotes = () => {
+    if (notesDraft !== null && notesDraft !== page?.notes) {
+      setNotes(page!.id, notesDraft);
+    }
+    setNotesDraft(null);
+  };
 
   if (!page) {
     return (
@@ -64,13 +82,25 @@ export default function PageDetailScreen() {
 
   const changeInterval = (interval: IntervalType) => {
     if (!page.reminder || page.reminder.interval === interval) return;
-    const times = page.reminder.times.map((t) => {
-      const base: ReminderTime = { hour: t.hour, minute: t.minute };
-      if (interval === 'weekly') base.weekday = t.weekday ?? 2;
-      if (interval === 'monthly') base.day = t.day ?? 1;
-      return base;
-    });
-    setReminder(page.id, { interval, times }, currentPeriodKey(interval, new Date()));
+    const times =
+      interval === 'once'
+        ? []
+        : page.reminder.times.map((t) => {
+            const base: ReminderTime = { hour: t.hour, minute: t.minute };
+            if (interval === 'weekly') base.weekday = t.weekday ?? 2;
+            if (interval === 'monthly') base.day = t.day ?? 1;
+            return base;
+          });
+    setReminder(
+      page.id,
+      { interval, times, onceAt: page.reminder.onceAt ?? null },
+      currentPeriodKey(interval, new Date())
+    );
+  };
+
+  const changeOnceAt = (onceAt: string) => {
+    if (!page.reminder) return;
+    setReminder(page.id, { ...page.reminder, onceAt }, page.lastResetPeriodKey);
   };
 
   const changeTime = (index: number, t: ReminderTime | null) => {
@@ -105,12 +135,8 @@ export default function PageDetailScreen() {
           placeholder="Title"
           placeholderTextColor={UI.textMuted}
           onChangeText={setTitleDraft}
-          onEndEditing={() => {
-            if (titleDraft !== null && titleDraft.trim() !== page.title) {
-              setTitle(page.id, titleDraft.trim());
-            }
-            setTitleDraft(null);
-          }}
+          onEndEditing={commitTitle}
+          onBlur={commitTitle}
         />
 
         {page.items.map((item) => (
@@ -148,6 +174,17 @@ export default function PageDetailScreen() {
           />
         </View>
 
+        <TextInput
+          style={styles.notes}
+          value={notesDraft ?? page.notes}
+          placeholder="Add a note…"
+          placeholderTextColor={UI.textMuted}
+          multiline
+          onChangeText={setNotesDraft}
+          onEndEditing={commitNotes}
+          onBlur={commitNotes}
+        />
+
         {page.type === 'reminder' && page.reminder && (
           <View style={styles.reminderSection}>
             <Text style={styles.sectionLabel}>Reminders</Text>
@@ -166,31 +203,45 @@ export default function PageDetailScreen() {
               })}
             </View>
 
-            {page.reminder.times.map((t, i) => (
-              <TimeRow
-                key={i}
-                interval={page.reminder!.interval}
-                time={t}
-                onChange={(next) => changeTime(i, next)}
-                onRemove={() => changeTime(i, null)}
-              />
-            ))}
+            {page.reminder.interval === 'once' ? (
+              <>
+                <OnceField value={page.reminder.onceAt ?? null} onChange={changeOnceAt} />
+                {!page.reminder.onceAt && (
+                  <Text style={styles.hint}>No date set — pick when to be reminded.</Text>
+                )}
+                <Text style={styles.hint}>
+                  Reminds you once at that moment, then never again. Ticking all items cancels it.
+                </Text>
+              </>
+            ) : (
+              <>
+                {page.reminder.times.map((t, i) => (
+                  <TimeRow
+                    key={i}
+                    interval={page.reminder!.interval}
+                    time={t}
+                    onChange={(next) => changeTime(i, next)}
+                    onRemove={() => changeTime(i, null)}
+                  />
+                ))}
 
-            <Pressable onPress={addTime}>
-              <Text style={styles.addTime}>＋ Add time</Text>
-            </Pressable>
-            {page.reminder.times.length === 0 && (
-              <Text style={styles.hint}>No times set — this page won't send reminders yet.</Text>
+                <Pressable onPress={addTime}>
+                  <Text style={styles.addTime}>＋ Add time</Text>
+                </Pressable>
+                {page.reminder.times.length === 0 && (
+                  <Text style={styles.hint}>No times set — this page won't send reminders yet.</Text>
+                )}
+                <Text style={styles.hint}>
+                  Reminders only fire while items are unticked. Ticks reset each{' '}
+                  {page.reminder.interval === 'daily'
+                    ? 'day'
+                    : page.reminder.interval === 'weekly'
+                      ? 'week (Monday)'
+                      : 'month (the 1st)'}
+                  .
+                </Text>
+              </>
             )}
-            <Text style={styles.hint}>
-              Reminders only fire while items are unticked. Ticks reset each{' '}
-              {page.reminder.interval === 'daily'
-                ? 'day'
-                : page.reminder.interval === 'weekly'
-                  ? 'week (Monday)'
-                  : 'month (the 1st)'}
-              .
-            </Text>
           </View>
         )}
 
@@ -218,15 +269,17 @@ function ItemText({
   onCommit: (text: string) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft !== null) onCommit(draft);
+    setDraft(null);
+  };
   return (
     <TextInput
       style={[styles.itemInput, checked && styles.checkedText]}
       value={draft ?? text}
       onChangeText={setDraft}
-      onEndEditing={() => {
-        if (draft !== null) onCommit(draft);
-        setDraft(null);
-      }}
+      onEndEditing={commit}
+      onBlur={commit}
       multiline
     />
   );
@@ -247,6 +300,17 @@ const styles = StyleSheet.create({
   checkbox: { fontSize: 20, color: UI.text },
   bullet: { fontSize: 16, color: UI.textMuted, width: 20, textAlign: 'center' },
   itemInput: { flex: 1, fontSize: 16, color: UI.text, paddingVertical: 6 },
+  notes: {
+    fontSize: 14,
+    color: UI.text,
+    lineHeight: 21,
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: UI.border,
+    minHeight: 44,
+    textAlignVertical: 'top',
+  },
   checkedText: { textDecorationLine: 'line-through', color: UI.textMuted },
   remove: { color: UI.textMuted, fontSize: 14, paddingHorizontal: 4 },
   reminderSection: { marginTop: 28, gap: 8 },

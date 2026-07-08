@@ -26,6 +26,9 @@ node scripts/manage.mjs add-item <page> "<text>" [more...]
 node scripts/manage.mjs remove-item <page> <textOrIndex>
 node scripts/manage.mjs check|uncheck <page> <textOrIndex>
 node scripts/manage.mjs tag|untag <page> <tag> [more...]
+node scripts/manage.mjs set-notes <page> "<paragraph>"
+node scripts/manage.mjs add-once "<title>" "2026-07-15 09:00"   # once-off reminder; resolve natural dates yourself
+node scripts/manage.mjs set-once <page> "2026-07-15 09:00"
 node scripts/manage.mjs set-times <page> "08:00,18:00"          # daily
 node scripts/manage.mjs set-times <page> "mon@08:00,fri@17:00"  # weekly
 node scripts/manage.mjs set-times <page> "1@08:00,15@18:00"     # monthly (day 1-28)

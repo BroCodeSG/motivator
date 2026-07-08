@@ -124,8 +124,25 @@ async function doReconcile(pages: Page[]): Promise<void> {
 
   await Notifications.cancelAllScheduledNotificationsAsync();
   for (const page of pages) {
-    if (page.type !== 'reminder' || !page.reminder || page.reminder.times.length === 0) continue;
+    if (page.type !== 'reminder' || !page.reminder) continue;
 
+    // Once-off: a single DATE trigger, suppressed when the date passed or
+    // every item is ticked. No items at all still notifies.
+    if (page.reminder.interval === 'once') {
+      if (!page.reminder.onceAt) continue;
+      const at = new Date(page.reminder.onceAt);
+      if (Number.isNaN(at.getTime()) || at.getTime() <= now.getTime()) continue;
+      const unchecked = page.items.filter((i) => !i.checked);
+      if (page.items.length > 0 && unchecked.length === 0) continue;
+      const body = unchecked.map((i) => i.text).join(' • ') || page.notes || page.title;
+      await Notifications.scheduleNotificationAsync({
+        content: content(page, body),
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at },
+      });
+      continue;
+    }
+
+    if (page.reminder.times.length === 0) continue;
     const periodKey = currentPeriodKey(page.reminder.interval, now);
     const items =
       page.lastResetPeriodKey !== periodKey
