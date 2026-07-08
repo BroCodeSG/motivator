@@ -49,7 +49,10 @@ function docToPage(id: string, data: any): Page {
 export async function loadCachedPages(): Promise<Page[]> {
   try {
     const raw = await AsyncStorage.getItem(cacheKey());
-    return raw ? (JSON.parse(raw) as Page[]) : [];
+    if (!raw) return [];
+    // Normalize like docToPage: caches written by older app versions
+    // may predate newer fields (tags, notes, ...).
+    return (JSON.parse(raw) as any[]).map((p) => docToPage(p.id, p));
   } catch {
     return [];
   }
