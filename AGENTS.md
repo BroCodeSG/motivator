@@ -2,7 +2,7 @@
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
 
-# Motivator app
+# TBKA (The Better Keeps App), formerly "Motivator"
 
 Google Keep-style Android app (Expo SDK 57 + expo-router + TypeScript). Multi-user: accounts are keyed by ID number with a PIN (SHA-256 hash in `users/{idNumber}`, entered once, session persists). Each user's pages live in `users/{idNumber}/pages`. Two page types: `reminder` (checkable items, daily/weekly/monthly notification times, only fires while items are unticked, ticks reset each period) and `list` (plain bullets).
 

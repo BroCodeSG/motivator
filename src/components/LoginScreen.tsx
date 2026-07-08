@@ -40,7 +40,8 @@ export function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.logo}>💪 Motivator</Text>
+      <Text style={styles.logo}>💪 TBKA</Text>
+      <Text style={styles.tagline}>The Better Keeps App</Text>
       <Text style={styles.subtitle}>
         Sign in once with your ID number and a PIN.{'\n'}New ID number? That creates your account.
       </Text>
@@ -77,6 +78,7 @@ export function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: UI.background, padding: 28, justifyContent: 'center', gap: 12 },
   logo: { fontSize: 30, fontWeight: '700', color: UI.text, textAlign: 'center' },
+  tagline: { color: UI.textMuted, textAlign: 'center', marginTop: -6 },
   subtitle: { color: UI.textMuted, textAlign: 'center', marginBottom: 16, lineHeight: 20 },
   input: {
     borderWidth: 1,

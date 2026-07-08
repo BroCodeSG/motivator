@@ -1,4 +1,4 @@
-# Motivator
+# TBKA — The Better Keeps App
 
 A Google Keep-style Android app for staying on track. Built with Expo (React Native + TypeScript) and Firebase Firestore — everything runs on free tiers.
 

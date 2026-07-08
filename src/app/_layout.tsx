@@ -56,7 +56,7 @@ function Root() {
           contentStyle: { backgroundColor: UI.background },
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'Motivator' }} />
+        <Stack.Screen name="index" options={{ title: 'TBKA' }} />
         <Stack.Screen name="page/new" options={{ title: 'New page', presentation: 'modal' }} />
         <Stack.Screen name="page/[id]" options={{ title: '' }} />
       </Stack>

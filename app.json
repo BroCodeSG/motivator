@@ -1,16 +1,17 @@
 {
   "expo": {
-    "name": "motivator",
-    "slug": "motivator",
+    "name": "TBKA",
+    "slug": "tbka",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "motivator",
+    "scheme": "tbka",
     "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.brocodesg.tbka",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
