@@ -95,5 +95,5 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  buttonText: { color: UI.onAccent, fontSize: 16, fontWeight: '600' },
 });

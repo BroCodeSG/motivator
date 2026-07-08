@@ -1,9 +1,10 @@
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FAB } from '@/components/FAB';
 import { PageCard } from '@/components/PageCard';
+import { confirmAction } from '@/lib/confirm';
 import {
   cancelAllNotifications,
   notificationsAvailable,
@@ -37,25 +38,25 @@ export default function HomeScreen() {
   };
 
   const signOut = () => {
-    Alert.alert('Sign out', 'Reminders stop until you sign in again. Your data stays saved.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: async () => {
-          setDebugVisible(false);
-          await cancelAllNotifications();
-          logout();
-        },
-      },
-    ]);
+    confirmAction(
+      'Sign out',
+      'Reminders stop until you sign in again. Your data stays saved.',
+      'Sign out',
+      async () => {
+        setDebugVisible(false);
+        await cancelAllNotifications();
+        logout();
+      }
+    );
   };
 
   const confirmDelete = (id: string, title: string) => {
-    Alert.alert('Delete page', `Delete "${title || 'Untitled'}" and all its items?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deletePage(id) },
-    ]);
+    confirmAction(
+      'Delete page',
+      `Delete "${title || 'Untitled'}" and all its items?`,
+      'Delete',
+      () => deletePage(id)
+    );
   };
 
   return (
@@ -119,7 +120,7 @@ export default function HomeScreen() {
             <Text style={styles.debugTitle}>Notifications</Text>
             <Text style={styles.debugText}>
               {!notificationsAvailable
-                ? 'Not available in Expo Go — reminders work in the installed app'
+                ? 'Reminders only fire in the installed Android app'
                 : count === null
                   ? 'Counting…'
                   : `${count} scheduled on this device`}
@@ -151,15 +152,15 @@ const styles = StyleSheet.create({
   },
   tagChipActive: { backgroundColor: UI.accent, borderColor: UI.accent },
   tagText: { color: UI.textMuted, fontSize: 13 },
-  tagTextActive: { color: '#fff', fontWeight: '600' },
+  tagTextActive: { color: UI.onAccent, fontWeight: '600' },
   gear: { fontSize: 20 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: UI.textMuted, fontSize: 16, textAlign: 'center', lineHeight: 24 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
-  debugCard: { backgroundColor: '#fff', borderRadius: 12, padding: 20, width: 260, gap: 10 },
+  debugCard: { backgroundColor: UI.surface, borderRadius: 12, padding: 20, width: 260, gap: 10 },
   debugTitle: { fontSize: 16, fontWeight: '600', color: UI.text },
   debugText: { color: UI.textMuted },
   debugButton: { backgroundColor: UI.accent, borderRadius: 8, padding: 10, alignItems: 'center' },
-  debugButtonText: { color: '#fff', fontWeight: '600' },
+  debugButtonText: { color: UI.onAccent, fontWeight: '600' },
   signOutButton: { backgroundColor: UI.danger },
 });

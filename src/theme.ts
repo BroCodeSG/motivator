@@ -1,15 +1,15 @@
-// Google Keep note palette
+// Google Keep dark-mode note palette
 export const PAGE_COLORS: Record<string, string> = {
-  white: '#ffffff',
-  red: '#f28b82',
-  orange: '#fbbc04',
-  yellow: '#fff475',
-  green: '#ccff90',
-  teal: '#a7ffeb',
-  blue: '#aecbfa',
-  pink: '#fdcfe8',
-  purple: '#d7aefb',
-  grey: '#e8eaed',
+  white: '#202124',
+  red: '#5c2b29',
+  orange: '#614a19',
+  yellow: '#635d19',
+  green: '#345920',
+  teal: '#16504b',
+  blue: '#2d555e',
+  pink: '#5b2245',
+  purple: '#42275e',
+  grey: '#3c3f43',
 };
 
 export const DEFAULT_COLOR = 'yellow';
@@ -19,10 +19,12 @@ export function pageColor(key: string): string {
 }
 
 export const UI = {
-  background: '#ffffff',
-  text: '#202124',
-  textMuted: '#5f6368',
-  border: '#dadce0',
-  accent: '#1a73e8',
-  danger: '#d93025',
+  background: '#202124',
+  surface: '#2d2e31',
+  text: '#e8eaed',
+  textMuted: '#9aa0a6',
+  border: '#5f6368',
+  accent: '#8ab4f8',
+  onAccent: '#202124',
+  danger: '#f28b82',
 };

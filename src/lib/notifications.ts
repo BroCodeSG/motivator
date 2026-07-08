@@ -6,11 +6,11 @@ import { currentPeriodKey, nextPeriodOccurrences } from '@/lib/periods';
 import type { Page, ReminderTime } from '@/types';
 
 // expo-notifications crashes on import inside Expo Go on Android (removed
-// since SDK 53), so the module is loaded lazily and everything here no-ops in
-// Expo Go. Reminders work in the real (EAS-built) app.
-export const notificationsAvailable = !(
-  Platform.OS === 'android' && Constants.executionEnvironment === 'storeClient'
-);
+// since SDK 53) and can't schedule offline reminders on web, so the module is
+// loaded lazily and everything here no-ops in those environments. Reminders
+// work in the real (EAS-built) app.
+export const notificationsAvailable =
+  Platform.OS === 'android' && Constants.executionEnvironment !== 'storeClient';
 
 type NotificationsModule = typeof import('expo-notifications');
 

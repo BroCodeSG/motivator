@@ -1,16 +1,11 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { TimeField } from '@/components/TimeField';
 import { UI } from '@/theme';
 import type { IntervalType, ReminderTime } from '@/types';
 
 // expo-notifications weekday convention: 1 = Sunday .. 7 = Saturday
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
-function fmt(n: number): string {
-  return n.toString().padStart(2, '0');
-}
 
 export function TimeRow({
   interval,
@@ -23,8 +18,6 @@ export function TimeRow({
   onChange: (t: ReminderTime) => void;
   onRemove: () => void;
 }) {
-  const [pickerOpen, setPickerOpen] = useState(false);
-
   return (
     <View style={styles.row}>
       {interval === 'weekly' && (
@@ -63,28 +56,17 @@ export function TimeRow({
         </View>
       )}
 
-      <Pressable style={styles.timeButton} onPress={() => setPickerOpen(true)}>
-        <Text style={styles.timeText}>
-          {fmt(time.hour)}:{fmt(time.minute)}
-        </Text>
-      </Pressable>
+      <View style={styles.timeSlot}>
+        <TimeField
+          hour={time.hour}
+          minute={time.minute}
+          onChange={(hour, minute) => onChange({ ...time, hour, minute })}
+        />
+      </View>
 
       <Pressable hitSlop={10} onPress={onRemove}>
         <Text style={styles.remove}>✕</Text>
       </Pressable>
-
-      {pickerOpen && (
-        <DateTimePicker
-          mode="time"
-          is24Hour
-          value={new Date(2000, 0, 1, time.hour, time.minute)}
-          onValueChange={(event, date) => {
-            setPickerOpen(false);
-            onChange({ ...time, hour: date.getHours(), minute: date.getMinutes() });
-          }}
-          onDismiss={() => setPickerOpen(false)}
-        />
-      )}
     </View>
   );
 }
@@ -103,18 +85,10 @@ const styles = StyleSheet.create({
   },
   chipActive: { backgroundColor: UI.accent, borderColor: UI.accent },
   chipText: { fontSize: 12, color: UI.textMuted },
-  chipTextActive: { color: '#fff', fontWeight: '600' },
+  chipTextActive: { color: UI.onAccent, fontWeight: '600' },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   stepButton: { fontSize: 18, color: UI.accent, paddingHorizontal: 6 },
   stepValue: { color: UI.text, minWidth: 54, textAlign: 'center' },
-  timeButton: {
-    borderWidth: 1,
-    borderColor: UI.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginLeft: 'auto',
-  },
-  timeText: { fontSize: 15, color: UI.text, fontVariant: ['tabular-nums'] },
+  timeSlot: { marginLeft: 'auto' },
   remove: { color: UI.textMuted, fontSize: 15, paddingHorizontal: 4 },
 });

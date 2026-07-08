@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center',
   },
-  segmentActive: { backgroundColor: '#e8f0fe', borderColor: UI.accent },
+  segmentActive: { backgroundColor: 'rgba(138,180,248,0.15)', borderColor: UI.accent },
   segmentText: { color: UI.textMuted, textTransform: 'capitalize' },
   segmentTextActive: { color: UI.accent, fontWeight: '600' },
   createButton: {
@@ -110,5 +110,5 @@ const styles = StyleSheet.create({
     padding: 14,
     alignItems: 'center',
   },
-  createText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  createText: { color: UI.onAccent, fontSize: 16, fontWeight: '600' },
 });

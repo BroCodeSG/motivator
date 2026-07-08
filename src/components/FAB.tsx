@@ -27,5 +27,5 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
   },
-  plus: { color: '#fff', fontSize: 26, lineHeight: 30 },
+  plus: { color: UI.onAccent, fontSize: 26, lineHeight: 30 },
 });
