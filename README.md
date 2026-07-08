@@ -1,56 +1,29 @@
-# Welcome to your Expo app 👋
+# Motivator
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A Google Keep-style Android app for staying on track. Built with Expo (React Native + TypeScript) and Firebase Firestore — everything runs on free tiers.
 
-## Get started
+## What it does
 
-1. Install dependencies
+- **Pages as colored cards** on a Keep-style grid, two kinds:
+  - **Reminder pages** — checkable items with daily, weekly, or monthly reminders at as many times as you like (e.g. daily at 08:00 and 18:00, or monthly on the 1st and 15th). Notifications only fire while items are still unticked, and ticks reset automatically at the start of each new day/week/month.
+  - **List pages** — plain bullet lists, no reminders.
+- **Simple accounts** — sign in once with an ID number + PIN; each user gets their own pages.
+- **Offline-friendly** — pages are cached locally; notifications are scheduled on-device.
+- **Admin CLI** — `scripts/manage.mjs` edits any account's data from a PC (add/remove/check items, set reminder times), handy for driving the app from scripts or AI assistants.
 
-   ```bash
-   npm install
-   ```
+## Setup
 
-2. Start the app
+1. `npm install`
+2. Create a free Firebase project, enable Firestore, and set rules to allow access (this app uses convenience-grade auth — don't store anything sensitive).
+3. Copy `src/firebase-config.example.ts` to `src/firebase-config.ts` and fill in your web app config from the Firebase console.
+4. For the admin CLI: download a service account key to `scripts/serviceAccountKey.json` (Project settings → Service accounts) and run `node scripts/manage.mjs set-user <idNumber>` once.
 
-   ```bash
-   npx expo start
-   ```
+## Run
 
-In the output, you'll find options to open the app in a
+- Dev: `npx expo start`, then open in Expo Go on Android (local notifications work in Expo Go).
+- Tests: `npm test` (date/period logic).
+- APK: `eas build -p android --profile preview` with a free [expo.dev](https://expo.dev) account.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Security note
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Auth is an ID number + hashed PIN stored in Firestore with open rules — it keeps accounts separate between honest users, nothing more. By design, for non-confidential data only.
