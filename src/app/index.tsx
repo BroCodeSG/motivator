@@ -1,16 +1,22 @@
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { FAB } from '@/components/FAB';
 import { PageCard } from '@/components/PageCard';
+import { Toggle } from '@/components/Toggle';
+import { changePin, getUserEmail, setUserEmail } from '@/lib/auth';
 import { confirmAction } from '@/lib/confirm';
-import {
-  cancelAllNotifications,
-  notificationsAvailable,
-  reconcileAll,
-  scheduledCount,
-} from '@/lib/notifications';
+import { cancelAllNotifications, notificationsAvailable, reconcileAll, scheduledCount } from '@/lib/notifications';
 import { deletePage } from '@/lib/pages';
 import { usePages } from '@/lib/pages-context';
 import { useSession } from '@/lib/session-context';
@@ -20,16 +26,42 @@ export default function HomeScreen() {
   const { pages, ready } = usePages();
   const { userId, logout } = useSession();
   const router = useRouter();
-  const [debugVisible, setDebugVisible] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
   const [count, setCount] = useState<number | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [emailDraft, setEmailDraft] = useState('');
+  const [pinDraft, setPinDraft] = useState('');
+  const [statusMsg, setStatusMsg] = useState('');
 
   const allTags = [...new Set(pages.flatMap((p) => p.tags))].sort();
-  const visiblePages = activeTag ? pages.filter((p) => p.tags.includes(activeTag)) : pages;
+  const visiblePages = pages
+    .filter((p) => (showArchived ? true : !p.archived))
+    .filter((p) => (activeTag ? p.tags.includes(activeTag) : true));
 
-  const openDebug = async () => {
-    setDebugVisible(true);
+  const openSettings = async () => {
+    setSettingsVisible(true);
+    setStatusMsg('');
+    setPinDraft('');
     setCount(await scheduledCount());
+    if (userId) setEmailDraft(await getUserEmail(userId));
+  };
+
+  const saveEmail = async () => {
+    if (!userId) return;
+    await setUserEmail(userId, emailDraft.trim());
+    setStatusMsg('Email saved.');
+  };
+
+  const savePin = async () => {
+    if (!userId) return;
+    if (!/^\d{4,}$/.test(pinDraft)) {
+      setStatusMsg('PIN must be at least 4 digits.');
+      return;
+    }
+    await changePin(userId, pinDraft);
+    setPinDraft('');
+    setStatusMsg('PIN updated.');
   };
 
   const resync = async () => {
@@ -38,24 +70,16 @@ export default function HomeScreen() {
   };
 
   const signOut = () => {
-    confirmAction(
-      'Sign out',
-      'Reminders stop until you sign in again. Your data stays saved.',
-      'Sign out',
-      async () => {
-        setDebugVisible(false);
-        await cancelAllNotifications();
-        logout();
-      }
-    );
+    confirmAction('Sign out', 'Reminders stop until you sign in again. Your data stays saved.', 'Sign out', async () => {
+      setSettingsVisible(false);
+      await cancelAllNotifications();
+      logout();
+    });
   };
 
-  const confirmDelete = (id: string, title: string) => {
-    confirmAction(
-      'Delete page',
-      `Delete "${title || 'Untitled'}" and all its items?`,
-      'Delete',
-      () => deletePage(id)
+  const confirmDelete = (pageId: string, title: string) => {
+    confirmAction('Delete page', `Delete "${title || 'Untitled'}" and all its items?`, 'Delete', () =>
+      deletePage(pageId)
     );
   };
 
@@ -64,32 +88,27 @@ export default function HomeScreen() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <Pressable onPress={openDebug} hitSlop={10}>
+            <Pressable onPress={openSettings} hitSlop={10}>
               <Text style={styles.gear}>⚙️</Text>
             </Pressable>
           ),
         }}
       />
       {allTags.length > 0 && (
-        <View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagBar}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagBar}>
+          <Pressable style={[styles.tagChip, activeTag === null && styles.tagChipActive]} onPress={() => setActiveTag(null)}>
+            <Text style={[styles.tagText, activeTag === null && styles.tagTextActive]}>All</Text>
+          </Pressable>
+          {allTags.map((tag) => (
             <Pressable
-              style={[styles.tagChip, activeTag === null && styles.tagChipActive]}
-              onPress={() => setActiveTag(null)}
+              key={tag}
+              style={[styles.tagChip, activeTag === tag && styles.tagChipActive]}
+              onPress={() => setActiveTag(activeTag === tag ? null : tag)}
             >
-              <Text style={[styles.tagText, activeTag === null && styles.tagTextActive]}>All</Text>
+              <Text style={[styles.tagText, activeTag === tag && styles.tagTextActive]}>#{tag}</Text>
             </Pressable>
-            {allTags.map((tag) => (
-              <Pressable
-                key={tag}
-                style={[styles.tagChip, activeTag === tag && styles.tagChipActive]}
-                onPress={() => setActiveTag(activeTag === tag ? null : tag)}
-              >
-                <Text style={[styles.tagText, activeTag === tag && styles.tagTextActive]}>#{tag}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
+          ))}
+        </ScrollView>
       )}
       {visiblePages.length === 0 ? (
         <View style={styles.empty}>
@@ -114,25 +133,63 @@ export default function HomeScreen() {
       )}
       <FAB onPress={() => router.push('/page/new')} />
 
-      <Modal visible={debugVisible} transparent animationType="fade" onRequestClose={() => setDebugVisible(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setDebugVisible(false)}>
-          <View style={styles.debugCard}>
-            <Text style={styles.debugTitle}>Notifications</Text>
-            <Text style={styles.debugText}>
-              {!notificationsAvailable
-                ? 'Reminders only fire in the installed Android app'
-                : count === null
-                  ? 'Counting…'
-                  : `${count} scheduled on this device`}
-            </Text>
-            <Pressable style={styles.debugButton} onPress={resync}>
-              <Text style={styles.debugButtonText}>Resync now</Text>
-            </Pressable>
-            <Text style={styles.debugText}>Signed in as {userId}</Text>
-            <Pressable style={[styles.debugButton, styles.signOutButton]} onPress={signOut}>
-              <Text style={styles.debugButtonText}>Sign out</Text>
-            </Pressable>
-          </View>
+      <Modal visible={settingsVisible} transparent animationType="fade" onRequestClose={() => setSettingsVisible(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setSettingsVisible(false)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <ScrollView contentContainerStyle={styles.sheetContent} keyboardShouldPersistTaps="handled">
+              <Text style={styles.sheetTitle}>Settings</Text>
+              <Text style={styles.muted}>Signed in as {userId}</Text>
+
+              <Text style={styles.label}>Email for reminders</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="you@example.com"
+                placeholderTextColor={UI.textMuted}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                value={emailDraft}
+                onChangeText={setEmailDraft}
+              />
+              <Pressable style={styles.button} onPress={saveEmail}>
+                <Text style={styles.buttonText}>Save email</Text>
+              </Pressable>
+
+              <Text style={styles.label}>Change PIN</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="New PIN"
+                placeholderTextColor={UI.textMuted}
+                keyboardType="number-pad"
+                secureTextEntry
+                value={pinDraft}
+                onChangeText={setPinDraft}
+              />
+              <Pressable style={styles.button} onPress={savePin}>
+                <Text style={styles.buttonText}>Update PIN</Text>
+              </Pressable>
+
+              <View style={styles.divider} />
+              <Toggle label="Show archived pages" value={showArchived} onChange={setShowArchived} />
+
+              <View style={styles.divider} />
+              <Text style={styles.muted}>
+                {!notificationsAvailable
+                  ? 'Reminders fire in the installed Android app'
+                  : count === null
+                    ? 'Counting…'
+                    : `${count} notifications scheduled`}
+              </Text>
+              <Pressable style={styles.button} onPress={resync}>
+                <Text style={styles.buttonText}>Resync notifications</Text>
+              </Pressable>
+
+              {statusMsg !== '' && <Text style={styles.status}>{statusMsg}</Text>}
+
+              <Pressable style={[styles.button, styles.signOut]} onPress={signOut}>
+                <Text style={styles.buttonText}>Sign out</Text>
+              </Pressable>
+            </ScrollView>
+          </Pressable>
         </Pressable>
       </Modal>
     </View>
@@ -143,24 +200,23 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: UI.background },
   grid: { padding: 6, paddingBottom: 100 },
   tagBar: { paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
-  tagChip: {
-    borderWidth: 1,
-    borderColor: UI.border,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
+  tagChip: { borderWidth: 1, borderColor: UI.border, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
   tagChipActive: { backgroundColor: UI.accent, borderColor: UI.accent },
   tagText: { color: UI.textMuted, fontSize: 13 },
   tagTextActive: { color: UI.onAccent, fontWeight: '600' },
   gear: { fontSize: 20 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: UI.textMuted, fontSize: 16, textAlign: 'center', lineHeight: 24 },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
-  debugCard: { backgroundColor: UI.surface, borderRadius: 12, padding: 20, width: 260, gap: 10 },
-  debugTitle: { fontSize: 16, fontWeight: '600', color: UI.text },
-  debugText: { color: UI.textMuted },
-  debugButton: { backgroundColor: UI.accent, borderRadius: 8, padding: 10, alignItems: 'center' },
-  debugButtonText: { color: UI.onAccent, fontWeight: '600' },
-  signOutButton: { backgroundColor: UI.danger },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  sheet: { backgroundColor: UI.surface, borderRadius: 14, width: 300, maxHeight: '85%' },
+  sheetContent: { padding: 20, gap: 8 },
+  sheetTitle: { fontSize: 18, fontWeight: '700', color: UI.text },
+  muted: { color: UI.textMuted, fontSize: 13 },
+  label: { color: UI.textMuted, fontSize: 13, marginTop: 10 },
+  input: { borderWidth: 1, borderColor: UI.border, borderRadius: 8, padding: 10, color: UI.text, fontSize: 15 },
+  button: { backgroundColor: UI.accent, borderRadius: 8, padding: 10, alignItems: 'center', marginTop: 4 },
+  buttonText: { color: UI.onAccent, fontWeight: '600' },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: UI.border, marginVertical: 8 },
+  status: { color: UI.accent, fontSize: 13, textAlign: 'center', marginTop: 4 },
+  signOut: { backgroundColor: UI.danger, marginTop: 12 },
 });

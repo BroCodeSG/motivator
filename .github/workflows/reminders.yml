@@ -1,0 +1,26 @@
+name: Send reminder emails
+
+on:
+  schedule:
+    - cron: '*/10 * * * *' # every 10 minutes (GitHub may delay by a few minutes)
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Africa/Johannesburg
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASS: ${{ secrets.SMTP_PASS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install cron dependencies
+        working-directory: scripts/cron
+        run: npm install --no-audit --no-fund
+      - name: Send due reminder emails
+        working-directory: scripts/cron
+        run: node notify-cron.mjs

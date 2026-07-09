@@ -12,8 +12,6 @@ export function currentPeriodKey(interval: IntervalType, now: Date): string {
       return format(now, "RRRR-'W'II");
     case 'monthly':
       return format(now, 'yyyy-MM');
-    case 'once':
-      return ''; // once-off reminders have no period and never reset
   }
 }
 
@@ -27,7 +25,6 @@ export function needsReset(interval: IntervalType, lastResetPeriodKey: string, n
 // app is never opened in between.
 export function nextPeriodOccurrences(reminder: ReminderConfig, now: Date): Date[] {
   const dates: Date[] = [];
-  if (reminder.interval === 'once') return dates;
   for (const t of reminder.times) {
     switch (reminder.interval) {
       case 'daily': {

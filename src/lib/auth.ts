@@ -1,5 +1,5 @@
 import * as Crypto from 'expo-crypto';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 
 import { db } from '@/firebase';
 
@@ -20,11 +20,25 @@ export async function signIn(idNumber: string, pin: string): Promise<SignInResul
   const ref = doc(db, 'users', idNumber);
   const snap = await getDoc(ref);
   if (!snap.exists()) {
-    await setDoc(ref, { pinHash, createdAt: serverTimestamp() });
+    await setDoc(ref, { pinHash, email: '', createdAt: serverTimestamp() });
     return { ok: true, created: true };
   }
   if (snap.data().pinHash !== pinHash) {
     return { ok: false, error: 'Wrong PIN for this ID number.' };
   }
   return { ok: true, created: false };
+}
+
+export async function changePin(idNumber: string, newPin: string): Promise<void> {
+  const pinHash = await hashPin(idNumber, newPin);
+  await updateDoc(doc(db, 'users', idNumber), { pinHash });
+}
+
+export async function getUserEmail(idNumber: string): Promise<string> {
+  const snap = await getDoc(doc(db, 'users', idNumber));
+  return snap.exists() ? snap.data().email ?? '' : '';
+}
+
+export async function setUserEmail(idNumber: string, email: string): Promise<void> {
+  await updateDoc(doc(db, 'users', idNumber), { email });
 }

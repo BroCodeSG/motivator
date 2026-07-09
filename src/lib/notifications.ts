@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-import { applyReset } from '@/lib/pages';
+import { applyReset, setArchived } from '@/lib/pages';
 import { currentPeriodKey, nextPeriodOccurrences } from '@/lib/periods';
 import type { Page, ReminderTime } from '@/types';
 
@@ -112,29 +112,36 @@ async function doReconcile(pages: Page[]): Promise<void> {
   const Notifications = getNotifications();
   const now = new Date();
 
-  // The period reset must happen even where notifications can't be scheduled.
+  // Maintenance that must run everywhere (including web, where notifications
+  // are unavailable): period resets for recurring lists, and auto-archiving
+  // once-off reminders whose moment has passed.
   for (const page of pages) {
-    if (page.type !== 'reminder' || !page.reminder) continue;
-    const periodKey = currentPeriodKey(page.reminder.interval, now);
-    if (page.lastResetPeriodKey !== periodKey) {
-      applyReset(page, periodKey).catch(() => {});
+    if (page.type === 'reminderList' && page.reminder) {
+      const periodKey = currentPeriodKey(page.reminder.interval, now);
+      if (page.lastResetPeriodKey !== periodKey) applyReset(page, periodKey).catch(() => {});
+    }
+    if (page.type === 'reminder' && page.onceAt && !page.archived) {
+      const at = new Date(page.onceAt);
+      if (!Number.isNaN(at.getTime()) && at.getTime() <= now.getTime()) {
+        setArchived(page.id, true).catch(() => {});
+      }
     }
   }
   if (!Notifications) return;
 
   await Notifications.cancelAllScheduledNotificationsAsync();
   for (const page of pages) {
-    if (page.type !== 'reminder' || !page.reminder) continue;
+    if (page.archived || !page.sendPush) continue;
 
-    // Once-off: a single DATE trigger, suppressed when the date passed or
-    // every item is ticked. No items at all still notifies.
-    if (page.reminder.interval === 'once') {
-      if (!page.reminder.onceAt) continue;
-      const at = new Date(page.reminder.onceAt);
+    // Once-off reminder: a single DATE trigger, suppressed once the date has
+    // passed or (if it has items) every item is ticked.
+    if (page.type === 'reminder') {
+      if (!page.onceAt) continue;
+      const at = new Date(page.onceAt);
       if (Number.isNaN(at.getTime()) || at.getTime() <= now.getTime()) continue;
       const unchecked = page.items.filter((i) => !i.checked);
       if (page.items.length > 0 && unchecked.length === 0) continue;
-      const body = unchecked.map((i) => i.text).join(' • ') || page.notes || page.title;
+      const body = unchecked.map((i) => i.text).join(' • ') || page.title;
       await Notifications.scheduleNotificationAsync({
         content: content(page, body),
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at },
@@ -142,7 +149,7 @@ async function doReconcile(pages: Page[]): Promise<void> {
       continue;
     }
 
-    if (page.reminder.times.length === 0) continue;
+    if (page.type !== 'reminderList' || !page.reminder || page.reminder.times.length === 0) continue;
     const periodKey = currentPeriodKey(page.reminder.interval, now);
     const items =
       page.lastResetPeriodKey !== periodKey

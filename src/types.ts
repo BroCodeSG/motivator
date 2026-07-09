@@ -1,10 +1,15 @@
-export type PageType = 'reminder' | 'list';
-export type IntervalType = 'daily' | 'weekly' | 'monthly' | 'once';
+// Three page types:
+//  - 'list'          plain list, no reminders
+//  - 'reminderList'  recurring checklist (daily/weekly/monthly reminders)
+//  - 'reminder'      once-off reminder at a single date/time; auto-archives once past
+export type PageType = 'list' | 'reminderList' | 'reminder';
+export type IntervalType = 'daily' | 'weekly' | 'monthly';
 
 export interface Item {
   id: string;
   text: string;
   checked: boolean;
+  note: string;
 }
 
 // weekday follows the expo-notifications convention: 1 = Sunday .. 7 = Saturday
@@ -18,8 +23,6 @@ export interface ReminderTime {
 export interface ReminderConfig {
   interval: IntervalType;
   times: ReminderTime[];
-  // 'once' interval only: local datetime "yyyy-MM-ddTHH:mm" the single reminder fires at
-  onceAt?: string | null;
 }
 
 export interface Page {
@@ -29,12 +32,21 @@ export interface Page {
   color: string;
   position: number;
   items: Item[];
-  notes: string;
   tags: string[];
-  reminder: ReminderConfig | null;
-  lastResetPeriodKey: string;
+  reminder: ReminderConfig | null; // reminderList only
+  onceAt: string | null; // reminder (once-off) only, local "yyyy-MM-ddTHH:mm"
+  sendPush: boolean; // reminder & reminderList
+  sendEmail: boolean; // reminder & reminderList
+  archived: boolean;
+  lastResetPeriodKey: string; // reminderList only
 }
 
 export function newItemId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
+
+export const PAGE_TYPE_LABEL: Record<PageType, string> = {
+  list: 'List',
+  reminderList: 'Reminder list',
+  reminder: 'Reminder',
+};

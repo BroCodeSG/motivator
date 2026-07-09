@@ -4,7 +4,12 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before 
 
 # TBKA (The Better Keeps App), formerly "Motivator"
 
-Google Keep-style Android app (Expo SDK 57 + expo-router + TypeScript). Multi-user: accounts are keyed by ID number with a PIN (SHA-256 hash in `users/{idNumber}`, entered once, session persists). Each user's pages live in `users/{idNumber}/pages`. Two page types: `reminder` (checkable items, daily/weekly/monthly notification times, only fires while items are unticked, ticks reset each period) and `list` (plain bullets).
+Google Keep-style app (Expo SDK 57 + expo-router + TypeScript; Android APK + web). Multi-user: accounts keyed by ID number + PIN (SHA-256 hash in `users/{idNumber}`, `email` field for reminders, entered once, session persists). Pages live in `users/{idNumber}/pages`. Three page types:
+- `list` — plain bullets, no reminders
+- `reminderList` — recurring checklist (daily/weekly/monthly times), fires while items unticked, ticks reset each period
+- `reminder` — once-off at `onceAt` datetime; auto-archives once past
+
+Items have per-item notes (shown under the item). Pages have tags, color, and (reminder types) `sendPush`/`sendEmail` toggles. Detail screen has a view mode (tick + Edit button) and an edit mode. `archived` pages hidden from the grid unless "Show archived" is on. Push = local notifications on the installed Android app. Email = GitHub Actions cron (scripts/cron/) — see below.
 
 - Data model + CRUD: `src/lib/pages.ts`, types in `src/types.ts`
 - Period/reset logic (pure, Jest-tested): `src/lib/periods.ts` — `npm test`
@@ -20,23 +25,29 @@ Commands act on the default account (`scripts/manage.mjs set-user <idNumber>` on
 ```
 node scripts/manage.mjs list
 node scripts/manage.mjs show <page>
-node scripts/manage.mjs add-page "<title>" [--type reminder|list] [--interval daily|weekly|monthly] [--color yellow]
+node scripts/manage.mjs add-page "<title>" [--type list|reminderList|reminder] [--interval daily|weekly|monthly] [--at "2026-07-15 09:00"] [--items "a;b;c"] [--push on|off] [--email on|off] [--color yellow]
+node scripts/manage.mjs add-once "<title>" "2026-07-15 09:00"   # shortcut for a once-off reminder; resolve natural dates yourself
 node scripts/manage.mjs remove-page <page>
 node scripts/manage.mjs add-item <page> "<text>" [more...]
 node scripts/manage.mjs remove-item <page> <textOrIndex>
 node scripts/manage.mjs check|uncheck <page> <textOrIndex>
+node scripts/manage.mjs set-item-note <page> <textOrIndex> "<note>"
 node scripts/manage.mjs tag|untag <page> <tag> [more...]
-node scripts/manage.mjs set-notes <page> "<paragraph>"
-node scripts/manage.mjs add-once "<title>" "2026-07-15 09:00"   # once-off reminder; resolve natural dates yourself
+node scripts/manage.mjs set-times <page> "08:00,18:00" | "mon@08:00,fri@17:00" | "1@08:00,15@18:00"
 node scripts/manage.mjs set-once <page> "2026-07-15 09:00"
-node scripts/manage.mjs set-times <page> "08:00,18:00"          # daily
-node scripts/manage.mjs set-times <page> "mon@08:00,fri@17:00"  # weekly
-node scripts/manage.mjs set-times <page> "1@08:00,15@18:00"     # monthly (day 1-28)
+node scripts/manage.mjs archive|unarchive <page>
+node scripts/manage.mjs notify <page> push|email on|off
+node scripts/manage.mjs set-email "you@example.com"            # this account's reminder email
 ```
 
 `<page>` = doc id or case-insensitive title prefix. The phone resyncs its notification schedule next time the app opens (data itself syncs live).
 
+## Email reminders (GitHub Actions cron)
+
+`scripts/cron/notify-cron.mjs` + `.github/workflows/reminders.yml` send emails for pages with `sendEmail` on, every ~10 min. Dedup via a per-page `lastEmailKey`. Needs repo secrets: `FIREBASE_SERVICE_ACCOUNT` (service-account JSON), `SMTP_USER` + `SMTP_PASS` (Gmail address + app password). Test locally: `node scripts/cron/notify-cron.mjs --dry-run` (uses local serviceAccountKey.json; sends nothing). TZ is pinned to Africa/Johannesburg in the workflow so local reminder times resolve correctly.
+
 ## Run / build
 
-- Dev: `npx expo start` then Expo Go on the phone. NOTE: expo-notifications crashes on import in Expo Go on Android (SDK 53+), so src/lib/notifications.ts lazy-loads it and no-ops in Expo Go — reminders are only testable in an EAS build.
+- Dev: `npx expo start` then Expo Go. NOTE: expo-notifications crashes on import in Expo Go on Android (SDK 53+), so src/lib/notifications.ts lazy-loads it and no-ops there — push reminders only work in an EAS build.
+- Web: `npx expo export --platform web` → deploy `dist/` with `npx firebase-tools deploy --only hosting` (project thebetterreminderapp → https://thebetterreminderapp.web.app). Time pickers, dialogs, notifications have web fallbacks.
 - APK: `eas build -p android --profile preview` (free tier, ~15 builds/month).
