@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     minHeight: 100,
   },
   archived: { opacity: 0.55 },
-  title: { fontSize: 16, fontWeight: '600', color: UI.text, marginBottom: 6 },
+  title: { fontSize: 19, fontWeight: '700', color: UI.text, marginBottom: 8 },
   item: { fontSize: 13, color: UI.text, marginBottom: 2 },
   itemNote: { fontSize: 11, color: UI.textMuted, marginLeft: 16, marginBottom: 2 },
   checked: { textDecorationLine: 'line-through', color: UI.textMuted },

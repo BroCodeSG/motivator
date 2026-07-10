@@ -21,6 +21,7 @@ const styles = StyleSheet.create({
     backgroundColor: UI.accent,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 20,
     elevation: 4,
     shadowColor: '#000',
     shadowOpacity: 0.25,

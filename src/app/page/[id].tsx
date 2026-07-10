@@ -33,7 +33,7 @@ import {
   setTitle,
   toggleItem,
 } from '@/lib/pages';
-import { usePage } from '@/lib/pages-context';
+import { usePage, usePages } from '@/lib/pages-context';
 import { pageColor, UI } from '@/theme';
 import type { IntervalType, Page, ReminderTime } from '@/types';
 
@@ -61,8 +61,10 @@ function reminderSummary(page: Page): string {
 export default function PageDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const page = usePage(id);
+  const { pages } = usePages();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const allTags = [...new Set(pages.flatMap((p) => p.tags))].sort();
 
   if (!page) {
     return (
@@ -82,6 +84,11 @@ export default function PageDetailScreen() {
       <Stack.Screen
         options={{
           headerStyle: { backgroundColor: pageColor(page.color) },
+          headerLeft: () => (
+            <Pressable onPress={() => router.back()} hitSlop={10}>
+              <Text style={styles.headerButton}>‹ Back</Text>
+            </Pressable>
+          ),
           headerRight: () => (
             <Pressable onPress={() => setEditing((e) => !e)} hitSlop={10}>
               <Text style={styles.headerButton}>{editing ? 'Done' : 'Edit'}</Text>
@@ -94,18 +101,20 @@ export default function PageDetailScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        {editing ? (
-          <EditView page={page} checkable={checkable} />
-        ) : (
-          <ReadView page={page} checkable={checkable} onEdit={() => setEditing(true)} />
-        )}
+        <View style={styles.card}>
+          {editing ? (
+            <EditView page={page} checkable={checkable} allTags={allTags} />
+          ) : (
+            <ReadView page={page} checkable={checkable} />
+          )}
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 // ---- Read-only view: tick items, read notes, tap Edit for everything else ----
-function ReadView({ page, checkable, onEdit }: { page: Page; checkable: boolean; onEdit: () => void }) {
+function ReadView({ page, checkable }: { page: Page; checkable: boolean }) {
   return (
     <>
       <Text style={styles.title}>{page.title || 'Untitled'}</Text>
@@ -148,16 +157,12 @@ function ReadView({ page, checkable, onEdit }: { page: Page; checkable: boolean;
           ))}
         </View>
       )}
-
-      <Pressable style={styles.editButton} onPress={onEdit}>
-        <Text style={styles.editButtonText}>Edit</Text>
-      </Pressable>
     </>
   );
 }
 
 // ---- Edit view: everything is editable ----
-function EditView({ page, checkable }: { page: Page; checkable: boolean }) {
+function EditView({ page, checkable, allTags }: { page: Page; checkable: boolean; allTags: string[] }) {
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [newItem, setNewItem] = useState('');
 
@@ -323,7 +328,7 @@ function EditView({ page, checkable }: { page: Page; checkable: boolean }) {
 
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Tags</Text>
-        <TagEditor tags={page.tags} onChange={(tags) => setTags(page.id, tags)} />
+        <TagEditor tags={page.tags} onChange={(tags) => setTags(page.id, tags)} suggestions={allTags} />
       </View>
 
       <View style={styles.section}>
@@ -368,7 +373,8 @@ function DraftInput({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 20, paddingBottom: 60 },
+  content: { padding: 20, paddingBottom: 60, alignItems: 'center' },
+  card: { width: '100%', maxWidth: 680 },
   missing: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   headerButton: { color: UI.accent, fontSize: 16, fontWeight: '600', paddingHorizontal: 4 },
   title: { fontSize: 24, fontWeight: '700', color: UI.text, marginBottom: 10 },
@@ -414,13 +420,4 @@ const styles = StyleSheet.create({
   hint: { fontSize: 12, color: UI.textMuted },
   readTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 18 },
   readTag: { fontSize: 13, color: UI.textMuted },
-  editButton: {
-    marginTop: 28,
-    borderWidth: 1,
-    borderColor: UI.accent,
-    borderRadius: 10,
-    padding: 12,
-    alignItems: 'center',
-  },
-  editButtonText: { color: UI.accent, fontWeight: '600', fontSize: 15 },
 });

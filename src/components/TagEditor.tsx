@@ -7,43 +7,71 @@ function normalizeTag(raw: string): string {
   return raw.trim().toLowerCase().replace(/^#/, '');
 }
 
-export function TagEditor({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
+export function TagEditor({
+  tags,
+  onChange,
+  suggestions = [],
+}: {
+  tags: string[];
+  onChange: (tags: string[]) => void;
+  suggestions?: string[];
+}) {
   const [draft, setDraft] = useState('');
 
-  const addTag = () => {
-    const tag = normalizeTag(draft);
+  const add = (raw: string) => {
+    const tag = normalizeTag(raw);
     setDraft('');
     if (!tag || tags.includes(tag)) return;
     onChange([...tags, tag]);
   };
 
+  // Existing tags on other pages that aren't already on this one, filtered by
+  // what's typed so far.
+  const q = normalizeTag(draft);
+  const available = suggestions
+    .filter((t) => !tags.includes(t))
+    .filter((t) => (q ? t.includes(q) : true));
+
   return (
     <View style={styles.wrap}>
-      {tags.map((tag) => (
-        <View key={tag} style={styles.chip}>
-          <Text style={styles.chipText}>#{tag}</Text>
-          <Pressable hitSlop={8} onPress={() => onChange(tags.filter((t) => t !== tag))}>
-            <Text style={styles.chipRemove}>✕</Text>
-          </Pressable>
+      <View style={styles.chipRow}>
+        {tags.map((tag) => (
+          <View key={tag} style={styles.chip}>
+            <Text style={styles.chipText}>#{tag}</Text>
+            <Pressable hitSlop={8} onPress={() => onChange(tags.filter((t) => t !== tag))}>
+              <Text style={styles.chipRemove}>✕</Text>
+            </Pressable>
+          </View>
+        ))}
+        <TextInput
+          style={styles.input}
+          placeholder="Add tag"
+          placeholderTextColor={UI.textMuted}
+          value={draft}
+          onChangeText={setDraft}
+          onSubmitEditing={() => add(draft)}
+          onBlur={() => add(draft)}
+          autoCapitalize="none"
+          returnKeyType="done"
+        />
+      </View>
+
+      {available.length > 0 && (
+        <View style={styles.suggestRow}>
+          {available.map((tag) => (
+            <Pressable key={tag} style={styles.suggest} onPress={() => add(tag)}>
+              <Text style={styles.suggestText}>+ #{tag}</Text>
+            </Pressable>
+          ))}
         </View>
-      ))}
-      <TextInput
-        style={styles.input}
-        placeholder="Add tag"
-        placeholderTextColor={UI.textMuted}
-        value={draft}
-        onChangeText={setDraft}
-        onSubmitEditing={addTag}
-        onEndEditing={addTag}
-        autoCapitalize="none"
-        returnKeyType="done"
-      />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  wrap: { gap: 8 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -58,4 +86,14 @@ const styles = StyleSheet.create({
   chipText: { color: UI.text, fontSize: 13 },
   chipRemove: { color: UI.textMuted, fontSize: 12 },
   input: { minWidth: 90, fontSize: 14, color: UI.text, paddingVertical: 4 },
+  suggestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  suggest: {
+    borderWidth: 1,
+    borderColor: UI.border,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  suggestText: { color: UI.textMuted, fontSize: 12 },
 });

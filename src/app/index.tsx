@@ -33,11 +33,16 @@ export default function HomeScreen() {
   const [emailDraft, setEmailDraft] = useState('');
   const [pinDraft, setPinDraft] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
+  const [search, setSearch] = useState('');
 
   const allTags = [...new Set(pages.flatMap((p) => p.tags))].sort();
+  const q = search.trim().toLowerCase();
   const visiblePages = pages
     .filter((p) => (showArchived ? true : !p.archived))
-    .filter((p) => (activeTag ? p.tags.includes(activeTag) : true));
+    .filter((p) => (activeTag ? p.tags.includes(activeTag) : true))
+    .filter((p) =>
+      q ? (p.title || '').toLowerCase().includes(q) || p.tags.some((t) => t.includes(q)) : true
+    );
 
   const openSettings = async () => {
     setSettingsVisible(true);
@@ -88,16 +93,31 @@ export default function HomeScreen() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <Pressable onPress={openSettings} hitSlop={10}>
-              <Text style={styles.gear}>⚙️</Text>
-            </Pressable>
+            <View style={styles.headerButtons}>
+              <Pressable onPress={() => router.push('/page/new')} hitSlop={10}>
+                <Text style={styles.headerAdd}>＋</Text>
+              </Pressable>
+              <Pressable onPress={openSettings} hitSlop={10}>
+                <Text style={styles.gear}>⚙️</Text>
+              </Pressable>
+            </View>
           ),
         }}
       />
+      {pages.length > 0 && (
+        <TextInput
+          style={styles.search}
+          placeholder="Search notes or #tags"
+          placeholderTextColor={UI.textMuted}
+          value={search}
+          onChangeText={setSearch}
+          autoCapitalize="none"
+        />
+      )}
       {allTags.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagBar}>
           <Pressable style={[styles.tagChip, activeTag === null && styles.tagChipActive]} onPress={() => setActiveTag(null)}>
-            <Text style={[styles.tagText, activeTag === null && styles.tagTextActive]}>All</Text>
+            <Text numberOfLines={1} style={[styles.tagText, activeTag === null && styles.tagTextActive]}>All</Text>
           </Pressable>
           {allTags.map((tag) => (
             <Pressable
@@ -105,7 +125,7 @@ export default function HomeScreen() {
               style={[styles.tagChip, activeTag === tag && styles.tagChipActive]}
               onPress={() => setActiveTag(activeTag === tag ? null : tag)}
             >
-              <Text style={[styles.tagText, activeTag === tag && styles.tagTextActive]}>#{tag}</Text>
+              <Text numberOfLines={1} style={[styles.tagText, activeTag === tag && styles.tagTextActive]}>#{tag}</Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -113,7 +133,13 @@ export default function HomeScreen() {
       {visiblePages.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyText}>
-            {!ready ? 'Loading…' : activeTag ? `No pages tagged #${activeTag}.` : 'No pages yet.\nTap ＋ to create your first one.'}
+            {!ready
+              ? 'Loading…'
+              : q
+                ? `No pages match "${search.trim()}".`
+                : activeTag
+                  ? `No pages tagged #${activeTag}.`
+                  : 'No pages yet.\nTap ＋ to create your first one.'}
           </Text>
         </View>
       ) : (
@@ -199,11 +225,32 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: UI.background },
   grid: { padding: 6, paddingBottom: 100 },
-  tagBar: { paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
-  tagChip: { borderWidth: 1, borderColor: UI.border, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
+  search: {
+    margin: 12,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: UI.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    color: UI.text,
+    fontSize: 15,
+    backgroundColor: UI.surface,
+  },
+  tagBar: { paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: 'center' },
+  tagChip: {
+    flexShrink: 0,
+    borderWidth: 1,
+    borderColor: UI.border,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
   tagChipActive: { backgroundColor: UI.accent, borderColor: UI.accent },
   tagText: { color: UI.textMuted, fontSize: 13 },
   tagTextActive: { color: UI.onAccent, fontWeight: '600' },
+  headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  headerAdd: { fontSize: 24, color: UI.accent, lineHeight: 26 },
   gear: { fontSize: 20 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: UI.textMuted, fontSize: 16, textAlign: 'center', lineHeight: 24 },
