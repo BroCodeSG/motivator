@@ -2,6 +2,7 @@
   "expo": {
     "name": "TBKA",
     "slug": "tbka",
+    "owner": "brocode159s-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -40,6 +41,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "99cb54ef-8544-48dd-a538-931ad34b6098"
+      }
     }
   }
 }
