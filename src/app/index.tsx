@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   tagChipActive: { backgroundColor: UI.accent, borderColor: UI.accent },
   tagText: { color: UI.textMuted, fontSize: 13 },
   tagTextActive: { color: UI.onAccent, fontWeight: '600' },
-  headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 18, paddingRight: 12 },
   headerAdd: { fontSize: 24, color: UI.accent, lineHeight: 26 },
   gear: { fontSize: 20 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },

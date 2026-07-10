@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 60, alignItems: 'center' },
   card: { width: '100%', maxWidth: 680 },
   missing: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  headerButton: { color: UI.accent, fontSize: 16, fontWeight: '600', paddingHorizontal: 4 },
+  headerButton: { color: UI.accent, fontSize: 16, fontWeight: '600', paddingHorizontal: 14 },
   title: { fontSize: 24, fontWeight: '700', color: UI.text, marginBottom: 10 },
   titleInput: { fontSize: 22, fontWeight: '600', color: UI.text, paddingVertical: 6, marginBottom: 10 },
   summary: { fontSize: 13, color: UI.textMuted, marginBottom: 14 },
