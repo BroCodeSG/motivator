@@ -23,12 +23,32 @@ const DRY = process.argv.includes('--dry-run');
 const LOOKBACK_MS = 20 * 60 * 1000; // send if a scheduled time landed in the last 20 min
 const here = dirname(fileURLToPath(import.meta.url));
 
-function serviceAccount() {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  return JSON.parse(readFileSync(join(here, '..', 'serviceAccountKey.json'), 'utf8'));
+function loadServiceAccount() {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+      return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } catch {
+      console.error('FIREBASE_SERVICE_ACCOUNT is set but is not valid JSON — check the secret.');
+      process.exit(1);
+    }
+  }
+  try {
+    return JSON.parse(readFileSync(join(here, '..', 'serviceAccountKey.json'), 'utf8'));
+  } catch {
+    return null;
+  }
 }
 
-initializeApp({ credential: cert(serviceAccount()) });
+const sa = loadServiceAccount();
+if (!sa) {
+  // Nothing to do yet — set the FIREBASE_SERVICE_ACCOUNT (and SMTP_USER/
+  // SMTP_PASS) repo secrets to enable email reminders. Exit 0 so the
+  // scheduled workflow doesn't report a failure every run.
+  console.log('No Firebase credentials found. Add the FIREBASE_SERVICE_ACCOUNT repo secret to enable email reminders.');
+  process.exit(0);
+}
+
+initializeApp({ credential: cert(sa) });
 const db = getFirestore();
 
 const pad = (n) => String(n).padStart(2, '0');
