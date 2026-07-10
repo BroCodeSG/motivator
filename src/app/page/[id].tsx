@@ -14,6 +14,7 @@ import {
 
 import { ColorDots } from '@/components/ColorDots';
 import { OnceField } from '@/components/OnceField';
+import { RichText, RichTextEditor } from '@/components/RichText';
 import { TagEditor } from '@/components/TagEditor';
 import { TimeRow } from '@/components/TimeRow';
 import { Toggle } from '@/components/Toggle';
@@ -22,6 +23,7 @@ import {
   addItem,
   removeItem,
   setArchived,
+  setBody,
   setColor,
   setItemNote,
   setItemText,
@@ -35,10 +37,11 @@ import {
 } from '@/lib/pages';
 import { usePage, usePages } from '@/lib/pages-context';
 import { pageColor, UI } from '@/theme';
-import type { IntervalType, Page, ReminderTime } from '@/types';
+import { PAGE_TYPE_LABEL, type IntervalType, type Page, type ReminderTime } from '@/types';
 
 const INTERVALS: IntervalType[] = ['daily', 'weekly', 'monthly'];
 const INTERVAL_RESET = { daily: 'day', weekly: 'week (Monday)', monthly: 'month (the 1st)' };
+const TYPE_ICON: Record<Page['type'], string> = { list: '📝', reminderList: '🔁', reminder: '🔔' };
 
 function defaultTime(interval: IntervalType): ReminderTime {
   if (interval === 'weekly') return { hour: 8, minute: 0, weekday: 2 };
@@ -128,9 +131,14 @@ function ReadView({ page, checkable }: { page: Page; checkable: boolean }) {
         </View>
       )}
 
-      {checkable && <Text style={styles.summary}>🔔 {reminderSummary(page)}</Text>}
+      <Text style={styles.summary}>
+        {TYPE_ICON[page.type]} {PAGE_TYPE_LABEL[page.type]}
+        {checkable ? ` · ${reminderSummary(page)}` : ''}
+      </Text>
 
-      {page.items.length === 0 && <Text style={styles.hint}>No items. Tap Edit to add some.</Text>}
+      {page.items.length === 0 && page.body === '' && (
+        <Text style={styles.hint}>Empty. Tap Edit to add items or a note.</Text>
+      )}
 
       {page.items.map((item) => (
         <View key={item.id} style={styles.readItem}>
@@ -147,6 +155,8 @@ function ReadView({ page, checkable }: { page: Page; checkable: boolean }) {
           {item.note !== '' && <Text style={styles.itemNote}>{item.note}</Text>}
         </View>
       ))}
+
+      {page.body !== '' && <RichText value={page.body} style={styles.readBody} />}
 
       {page.tags.length > 0 && (
         <View style={styles.readTags}>
@@ -206,6 +216,9 @@ function EditView({ page, checkable, allTags }: { page: Page; checkable: boolean
 
   return (
     <>
+      <Text style={styles.editingLabel}>
+        Editing {TYPE_ICON[page.type]} {PAGE_TYPE_LABEL[page.type]}
+      </Text>
       <TextInput
         style={styles.titleInput}
         value={titleDraft ?? page.title}
@@ -248,8 +261,8 @@ function EditView({ page, checkable, allTags }: { page: Page; checkable: boolean
         </View>
       ))}
 
-      <View style={styles.itemRow}>
-        <Text style={styles.bullet}>＋</Text>
+      <View style={[styles.itemRow, styles.addRow]}>
+        <Text style={styles.checkbox}>{checkable ? '☐' : '•'}</Text>
         <TextInput
           style={styles.itemInput}
           placeholder="Add item"
@@ -259,6 +272,17 @@ function EditView({ page, checkable, allTags }: { page: Page; checkable: boolean
           onSubmitEditing={submitNewItem}
           blurOnSubmit={false}
           returnKeyType="done"
+        />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Note</Text>
+        <RichTextEditor
+          value={page.body}
+          onCommit={(text) => {
+            if (text !== page.body) setBody(page.id, text);
+          }}
+          placeholder="Write a note… (B/I for bold/italic)"
         />
       </View>
 
@@ -380,6 +404,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '700', color: UI.text, marginBottom: 10 },
   titleInput: { fontSize: 22, fontWeight: '600', color: UI.text, paddingVertical: 6, marginBottom: 10 },
   summary: { fontSize: 13, color: UI.textMuted, marginBottom: 14 },
+  editingLabel: { fontSize: 12, color: UI.textMuted, fontWeight: '600', textTransform: 'uppercase', marginBottom: 6 },
+  readBody: { marginTop: 14 },
   archivedBanner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -391,7 +417,21 @@ const styles = StyleSheet.create({
   archivedText: { color: UI.text, fontWeight: '600' },
   link: { color: UI.accent, fontWeight: '600', paddingVertical: 4 },
   readItem: { marginBottom: 8 },
-  editItem: { marginBottom: 12 },
+  editItem: {
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: UI.border,
+    borderRadius: 8,
+    padding: 8,
+    backgroundColor: 'rgba(0,0,0,0.12)',
+  },
+  addRow: {
+    borderWidth: 1,
+    borderColor: UI.border,
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+  },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
   checkbox: { fontSize: 20, color: UI.text },
   bullet: { fontSize: 16, color: UI.textMuted, width: 20, textAlign: 'center' },

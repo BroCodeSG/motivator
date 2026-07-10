@@ -11,7 +11,7 @@ import {
 
 import { db } from '@/firebase';
 import { currentPeriodKey } from '@/lib/periods';
-import type { IntervalType, Item, Page, PageType, ReminderConfig } from '@/types';
+import type { IntervalType, Item, Page, PageType, ReminderConfig, ReminderTime } from '@/types';
 import { newItemId } from '@/types';
 
 // Each account is keyed by the user's ID number: users/{idNumber}/pages/{pageId}.
@@ -69,6 +69,7 @@ function docToPage(id: string, data: any): Page {
     color: data.color ?? 'yellow',
     position: data.position ?? 0,
     items: normalizeItems(data.items),
+    body: data.body ?? '',
     tags: Array.isArray(data.tags) ? data.tags : [],
     reminder,
     onceAt,
@@ -111,14 +112,16 @@ export async function createPage(opts: {
   color: string;
   position: number;
   interval?: IntervalType; // reminderList
+  times?: ReminderTime[]; // reminderList
   onceAt?: string | null; // reminder
   itemTexts?: string[];
+  body?: string;
   sendEmail?: boolean;
   sendPush?: boolean;
 }): Promise<string> {
   const id = newItemId();
   const reminder: ReminderConfig | null =
-    opts.type === 'reminderList' ? { interval: opts.interval ?? 'daily', times: [] } : null;
+    opts.type === 'reminderList' ? { interval: opts.interval ?? 'daily', times: opts.times ?? [] } : null;
   const items: Item[] = (opts.itemTexts ?? [])
     .map((t) => t.trim())
     .filter(Boolean)
@@ -130,6 +133,7 @@ export async function createPage(opts: {
     color: opts.color,
     position: opts.position,
     items,
+    body: opts.body ?? '',
     tags: [],
     reminder,
     onceAt: opts.type === 'reminder' ? opts.onceAt ?? null : null,
@@ -155,6 +159,7 @@ export const setTitle = (id: string, title: string) => update(id, { title });
 export const setColor = (id: string, color: string) => update(id, { color });
 export const setItems = (id: string, items: Item[]) => update(id, { items });
 export const setTags = (id: string, tags: string[]) => update(id, { tags });
+export const setBody = (id: string, body: string) => update(id, { body });
 export const setOnceAt = (id: string, onceAt: string) => update(id, { onceAt });
 export const setArchived = (id: string, archived: boolean) => update(id, { archived });
 export const setSendEmail = (id: string, sendEmail: boolean) => update(id, { sendEmail });

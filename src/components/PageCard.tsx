@@ -14,7 +14,7 @@ function badge(page: Page): string | null {
     const r = page.reminder;
     return `🔁 ${INTERVAL_LABEL[r.interval]}${r.times.length ? ` ×${r.times.length}` : ' (no times)'}`;
   }
-  return null;
+  return '📝 Note';
 }
 
 export function PageCard({

@@ -76,11 +76,21 @@ export function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: UI.background, padding: 28, justifyContent: 'center', gap: 12 },
+  container: {
+    flex: 1,
+    backgroundColor: UI.background,
+    padding: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
   logo: { fontSize: 30, fontWeight: '700', color: UI.text, textAlign: 'center' },
   tagline: { color: UI.textMuted, textAlign: 'center', marginTop: -6 },
   subtitle: { color: UI.textMuted, textAlign: 'center', marginBottom: 16, lineHeight: 20 },
   input: {
+    width: '100%',
+    maxWidth: 380,
+    alignSelf: 'center',
     borderWidth: 1,
     borderColor: UI.border,
     borderRadius: 10,
@@ -90,6 +100,9 @@ const styles = StyleSheet.create({
   },
   error: { color: UI.danger, textAlign: 'center' },
   button: {
+    width: '100%',
+    maxWidth: 380,
+    alignSelf: 'center',
     backgroundColor: UI.accent,
     borderRadius: 10,
     padding: 14,

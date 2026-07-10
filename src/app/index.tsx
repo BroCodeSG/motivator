@@ -29,6 +29,7 @@ export default function HomeScreen() {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [count, setCount] = useState<number | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState<'all' | 'list' | 'reminder' | 'reminderList'>('all');
   const [showArchived, setShowArchived] = useState(false);
   const [emailDraft, setEmailDraft] = useState('');
   const [pinDraft, setPinDraft] = useState('');
@@ -39,10 +40,18 @@ export default function HomeScreen() {
   const q = search.trim().toLowerCase();
   const visiblePages = pages
     .filter((p) => (showArchived ? true : !p.archived))
+    .filter((p) => (typeFilter === 'all' ? true : p.type === typeFilter))
     .filter((p) => (activeTag ? p.tags.includes(activeTag) : true))
     .filter((p) =>
       q ? (p.title || '').toLowerCase().includes(q) || p.tags.some((t) => t.includes(q)) : true
     );
+
+  const TYPE_FILTERS: { key: typeof typeFilter; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'list', label: '📝 Notes' },
+    { key: 'reminder', label: '🔔 Reminders' },
+    { key: 'reminderList', label: '🔁 Recurring' },
+  ];
 
   const openSettings = async () => {
     setSettingsVisible(true);
@@ -114,8 +123,33 @@ export default function HomeScreen() {
           autoCapitalize="none"
         />
       )}
+      {pages.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipScroll}
+          contentContainerStyle={styles.tagBar}
+        >
+          {TYPE_FILTERS.map((f) => (
+            <Pressable
+              key={f.key}
+              style={[styles.tagChip, typeFilter === f.key && styles.tagChipActive]}
+              onPress={() => setTypeFilter(f.key)}
+            >
+              <Text numberOfLines={1} style={[styles.tagText, typeFilter === f.key && styles.tagTextActive]}>
+                {f.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
       {allTags.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagBar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipScroll}
+          contentContainerStyle={styles.tagBar}
+        >
           <Pressable style={[styles.tagChip, activeTag === null && styles.tagChipActive]} onPress={() => setActiveTag(null)}>
             <Text numberOfLines={1} style={[styles.tagText, activeTag === null && styles.tagTextActive]}>All</Text>
           </Pressable>
@@ -237,7 +271,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     backgroundColor: UI.surface,
   },
-  tagBar: { paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: 'center' },
+  chipScroll: { flexGrow: 0, flexShrink: 0 },
+  tagBar: { paddingHorizontal: 12, paddingVertical: 5, gap: 8 },
   tagChip: {
     flexShrink: 0,
     borderWidth: 1,

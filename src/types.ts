@@ -32,6 +32,7 @@ export interface Page {
   color: string;
   position: number;
   items: Item[];
+  body: string; // free-text note body, supports **bold** / *italic* markdown
   tags: string[];
   reminder: ReminderConfig | null; // reminderList only
   onceAt: string | null; // reminder (once-off) only, local "yyyy-MM-ddTHH:mm"
@@ -46,7 +47,7 @@ export function newItemId(): string {
 }
 
 export const PAGE_TYPE_LABEL: Record<PageType, string> = {
-  list: 'List',
+  list: 'Note',
   reminderList: 'Reminder list',
   reminder: 'Reminder',
 };
