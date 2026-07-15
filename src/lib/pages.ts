@@ -15,7 +15,6 @@ import type { IntervalType, Item, Page, PageType, ReminderConfig, ReminderTime }
 import { newItemId } from '@/types';
 
 // Each account is keyed by the user's ID number: users/{idNumber}/pages/{pageId}.
-// The provider sets the active user before subscribing.
 let activeUserId = '';
 
 export function setActiveUser(id: string) {
@@ -40,26 +39,34 @@ function normalizeItems(raw: any): Item[] {
 }
 
 // Reads a Firestore doc into a Page, filling defaults and migrating older
-// shapes: the previous single 'reminder' type (with interval 'once' or a
-// recurring interval) is split into 'reminder' (once-off) and 'reminderList'.
+// shapes. Legacy types: 'list' -> 'note' (items folded into the body as
+// bullets); 'reminder' (once-off) -> 'note' with notify enabled.
 function docToPage(id: string, data: any): Page {
-  let type: PageType = data.type ?? 'list';
+  const raw = data.type ?? 'note';
+  let type: PageType = 'note';
+  let body: string = data.body ?? '';
+  let notifyEnabled = !!data.notifyEnabled;
+  let onceAt: string | null = data.onceAt ?? data.reminder?.onceAt ?? null;
+  let items = normalizeItems(data.items);
   let reminder: ReminderConfig | null = data.reminder ?? null;
-  let onceAt: string | null = data.onceAt ?? null;
 
-  if (type === 'reminder' && reminder) {
-    if ((reminder.interval as string) === 'once') {
-      onceAt = onceAt ?? (reminder as any).onceAt ?? null;
-      reminder = null;
-    } else {
-      type = 'reminderList';
-    }
-  }
-  if (type === 'reminderList' && !reminder) reminder = { interval: 'daily', times: [] };
-  if (type === 'reminderList' && reminder) {
-    reminder = { interval: reminder.interval, times: Array.isArray(reminder.times) ? reminder.times : [] };
-  } else {
+  const foldItemsIntoBody = () => {
+    if (!body && items.length) body = items.map((i) => `- ${i.text}`).join('\n');
+    items = [];
     reminder = null;
+  };
+
+  if (raw === 'reminderList') {
+    type = 'reminderList';
+    reminder = reminder ? { interval: reminder.interval, times: Array.isArray(reminder.times) ? reminder.times : [] } : { interval: 'daily', times: [] };
+  } else if (raw === 'reminder') {
+    type = 'note';
+    notifyEnabled = true;
+    foldItemsIntoBody();
+  } else {
+    // 'list', 'note', or unknown
+    type = 'note';
+    foldItemsIntoBody();
   }
 
   return {
@@ -68,20 +75,19 @@ function docToPage(id: string, data: any): Page {
     type,
     color: data.color ?? 'yellow',
     position: data.position ?? 0,
-    items: normalizeItems(data.items),
-    body: data.body ?? '',
     tags: Array.isArray(data.tags) ? data.tags : [],
-    reminder,
-    onceAt,
-    sendEmail: !!data.sendEmail,
-    sendPush: data.sendPush ?? true,
     archived: !!data.archived,
+    body,
+    notifyEnabled,
+    onceAt,
+    items,
+    reminder: type === 'reminderList' ? reminder : null,
     lastResetPeriodKey: data.lastResetPeriodKey ?? '',
+    sendPush: data.sendPush ?? true,
+    sendEmail: !!data.sendEmail,
   };
 }
 
-// The Firebase JS SDK only has a memory cache in React Native, so we mirror
-// the last snapshot into AsyncStorage to have data on offline cold starts.
 export async function loadCachedPages(): Promise<Page[]> {
   try {
     const raw = await AsyncStorage.getItem(cacheKey());
@@ -111,36 +117,41 @@ export async function createPage(opts: {
   type: PageType;
   color: string;
   position: number;
-  interval?: IntervalType; // reminderList
-  times?: ReminderTime[]; // reminderList
-  onceAt?: string | null; // reminder
-  itemTexts?: string[];
   body?: string;
+  notifyEnabled?: boolean;
+  onceAt?: string | null;
+  interval?: IntervalType;
+  times?: ReminderTime[];
+  items?: { text: string; note?: string }[];
   sendEmail?: boolean;
   sendPush?: boolean;
 }): Promise<string> {
   const id = newItemId();
-  const reminder: ReminderConfig | null =
-    opts.type === 'reminderList' ? { interval: opts.interval ?? 'daily', times: opts.times ?? [] } : null;
-  const items: Item[] = (opts.itemTexts ?? [])
-    .map((t) => t.trim())
-    .filter(Boolean)
-    .map((text) => ({ id: newItemId(), text, checked: false, note: '' }));
+  const isList = opts.type === 'reminderList';
+  const reminder: ReminderConfig | null = isList
+    ? { interval: opts.interval ?? 'daily', times: opts.times ?? [] }
+    : null;
+  const items: Item[] = isList
+    ? (opts.items ?? [])
+        .filter((i) => i.text.trim())
+        .map((i) => ({ id: newItemId(), text: i.text.trim(), checked: false, note: i.note ?? '' }))
+    : [];
 
   await setDoc(doc(pagesCol(), id), {
     title: opts.title,
     type: opts.type,
     color: opts.color,
     position: opts.position,
-    items,
-    body: opts.body ?? '',
     tags: [],
-    reminder,
-    onceAt: opts.type === 'reminder' ? opts.onceAt ?? null : null,
-    sendEmail: opts.sendEmail ?? false,
-    sendPush: opts.sendPush ?? true,
     archived: false,
+    body: isList ? '' : opts.body ?? '',
+    notifyEnabled: isList ? false : !!opts.notifyEnabled,
+    onceAt: isList ? null : opts.onceAt ?? null,
+    items,
+    reminder,
     lastResetPeriodKey: reminder ? currentPeriodKey(reminder.interval, new Date()) : '',
+    sendPush: opts.sendPush ?? true,
+    sendEmail: opts.sendEmail ?? false,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -161,6 +172,7 @@ export const setItems = (id: string, items: Item[]) => update(id, { items });
 export const setTags = (id: string, tags: string[]) => update(id, { tags });
 export const setBody = (id: string, body: string) => update(id, { body });
 export const setOnceAt = (id: string, onceAt: string) => update(id, { onceAt });
+export const setNotifyEnabled = (id: string, notifyEnabled: boolean) => update(id, { notifyEnabled });
 export const setArchived = (id: string, archived: boolean) => update(id, { archived });
 export const setSendEmail = (id: string, sendEmail: boolean) => update(id, { sendEmail });
 export const setSendPush = (id: string, sendPush: boolean) => update(id, { sendPush });
@@ -184,21 +196,14 @@ export function toggleItem(page: Page, itemId: string): Promise<void> {
 }
 
 export function setItemText(page: Page, itemId: string, text: string): Promise<void> {
-  return setItems(
-    page.id,
-    page.items.map((i) => (i.id === itemId ? { ...i, text } : i))
-  );
+  return setItems(page.id, page.items.map((i) => (i.id === itemId ? { ...i, text } : i)));
 }
 
 export function setItemNote(page: Page, itemId: string, note: string): Promise<void> {
-  return setItems(
-    page.id,
-    page.items.map((i) => (i.id === itemId ? { ...i, note } : i))
-  );
+  return setItems(page.id, page.items.map((i) => (i.id === itemId ? { ...i, note } : i)));
 }
 
-// Applied lazily when a new period starts (reminderList only): uncheck
-// everything and stamp the new period.
+// Applied lazily when a new period starts (reminderList only).
 export function applyReset(page: Page, periodKey: string): Promise<void> {
   return update(page.id, {
     items: page.items.map((i) => ({ ...i, checked: false })),

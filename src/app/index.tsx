@@ -29,7 +29,7 @@ export default function HomeScreen() {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [count, setCount] = useState<number | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [typeFilter, setTypeFilter] = useState<'all' | 'list' | 'reminder' | 'reminderList'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'note' | 'reminder' | 'recurring'>('all');
   const [showArchived, setShowArchived] = useState(false);
   const [emailDraft, setEmailDraft] = useState('');
   const [pinDraft, setPinDraft] = useState('');
@@ -38,9 +38,15 @@ export default function HomeScreen() {
 
   const allTags = [...new Set(pages.flatMap((p) => p.tags))].sort();
   const q = search.trim().toLowerCase();
+  const matchesType = (p: (typeof pages)[number]) => {
+    if (typeFilter === 'all') return true;
+    if (typeFilter === 'note') return p.type === 'note' && !p.notifyEnabled;
+    if (typeFilter === 'reminder') return p.type === 'note' && p.notifyEnabled;
+    return p.type === 'reminderList'; // 'recurring'
+  };
   const visiblePages = pages
     .filter((p) => (showArchived ? true : !p.archived))
-    .filter((p) => (typeFilter === 'all' ? true : p.type === typeFilter))
+    .filter(matchesType)
     .filter((p) => (activeTag ? p.tags.includes(activeTag) : true))
     .filter((p) =>
       q ? (p.title || '').toLowerCase().includes(q) || p.tags.some((t) => t.includes(q)) : true
@@ -48,9 +54,9 @@ export default function HomeScreen() {
 
   const TYPE_FILTERS: { key: typeof typeFilter; label: string }[] = [
     { key: 'all', label: 'All' },
-    { key: 'list', label: '📝 Notes' },
+    { key: 'note', label: '📝 Notes' },
     { key: 'reminder', label: '🔔 Reminders' },
-    { key: 'reminderList', label: '🔁 Recurring' },
+    { key: 'recurring', label: '🔁 Recurring' },
   ];
 
   const openSettings = async () => {

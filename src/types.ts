@@ -1,15 +1,16 @@
-// Three page types:
-//  - 'list'          plain list, no reminders
-//  - 'reminderList'  recurring checklist (daily/weekly/monthly reminders)
-//  - 'reminder'      once-off reminder at a single date/time; auto-archives once past
-export type PageType = 'list' | 'reminderList' | 'reminder';
+// Two page types:
+//  - 'note'          a rich-text note. Turn on `notifyEnabled` + set `onceAt`
+//                    and it becomes a one-off reminder that fires with the body.
+//  - 'reminderList'  a recurring checklist; each item has its own rich-text note
+//                    block, and the list reminds you on a daily/weekly/monthly schedule.
+export type PageType = 'note' | 'reminderList';
 export type IntervalType = 'daily' | 'weekly' | 'monthly';
 
 export interface Item {
   id: string;
   text: string;
   checked: boolean;
-  note: string;
+  note: string; // per-item rich-text block (markdown)
 }
 
 // weekday follows the expo-notifications convention: 1 = Sunday .. 7 = Saturday
@@ -31,15 +32,22 @@ export interface Page {
   type: PageType;
   color: string;
   position: number;
-  items: Item[];
-  body: string; // free-text note body, supports **bold** / *italic* markdown
   tags: string[];
-  reminder: ReminderConfig | null; // reminderList only
-  onceAt: string | null; // reminder (once-off) only, local "yyyy-MM-ddTHH:mm"
-  sendPush: boolean; // reminder & reminderList
-  sendEmail: boolean; // reminder & reminderList
   archived: boolean;
-  lastResetPeriodKey: string; // reminderList only
+
+  // note
+  body: string;
+  notifyEnabled: boolean; // note becomes a one-off reminder when true
+  onceAt: string | null; // local "yyyy-MM-ddTHH:mm"
+
+  // reminderList
+  items: Item[];
+  reminder: ReminderConfig | null;
+  lastResetPeriodKey: string;
+
+  // shared reminder channels (note-with-notify + reminderList)
+  sendPush: boolean;
+  sendEmail: boolean;
 }
 
 export function newItemId(): string {
@@ -47,7 +55,6 @@ export function newItemId(): string {
 }
 
 export const PAGE_TYPE_LABEL: Record<PageType, string> = {
-  list: 'Note',
+  note: 'Note',
   reminderList: 'Reminder list',
-  reminder: 'Reminder',
 };

@@ -1,20 +1,19 @@
 import { format } from 'date-fns';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { stripMarkdown } from '@/components/RichText';
 import { pageColor, UI } from '@/theme';
 import type { Page } from '@/types';
 
 const INTERVAL_LABEL = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
 
-function badge(page: Page): string | null {
-  if (page.type === 'reminder') {
-    return page.onceAt ? `🔔 ${format(new Date(page.onceAt), 'EEE d MMM HH:mm')}` : '🔔 No date set';
+function badge(page: Page): string {
+  if (page.type === 'note') {
+    if (page.notifyEnabled && page.onceAt) return `🔔 ${format(new Date(page.onceAt), 'EEE d MMM HH:mm')}`;
+    return '📝 Note';
   }
-  if (page.type === 'reminderList' && page.reminder) {
-    const r = page.reminder;
-    return `🔁 ${INTERVAL_LABEL[r.interval]}${r.times.length ? ` ×${r.times.length}` : ' (no times)'}`;
-  }
-  return '📝 Note';
+  const r = page.reminder;
+  return `🔁 ${r ? INTERVAL_LABEL[r.interval] : 'Daily'}${r?.times.length ? ` ×${r.times.length}` : ''}`;
 }
 
 export function PageCard({
@@ -26,9 +25,8 @@ export function PageCard({
   onPress: () => void;
   onLongPress: () => void;
 }) {
-  const checkable = page.type === 'reminder' || page.type === 'reminderList';
-  const preview = page.items.slice(0, 4);
-  const info = badge(page);
+  const bodyPreview = page.type === 'note' ? stripMarkdown(page.body).split('\n').filter(Boolean).slice(0, 5) : [];
+  const items = page.type === 'reminderList' ? page.items.slice(0, 4) : [];
   return (
     <Pressable
       onPress={onPress}
@@ -38,21 +36,24 @@ export function PageCard({
       <Text style={styles.title} numberOfLines={1}>
         {page.title || 'Untitled'}
       </Text>
-      {preview.map((item) => (
-        <View key={item.id}>
-          <Text style={[styles.item, item.checked && styles.checked]} numberOfLines={1}>
-            {checkable ? (item.checked ? '☑ ' : '☐ ') : '• '}
-            {item.text}
-          </Text>
-          {item.note !== '' && (
-            <Text style={styles.itemNote} numberOfLines={1}>
-              {item.note}
-            </Text>
-          )}
-        </View>
+
+      {bodyPreview.map((line, i) => (
+        <Text key={i} style={styles.item} numberOfLines={1}>
+          {line}
+        </Text>
       ))}
-      {page.items.length > 4 && <Text style={styles.more}>+{page.items.length - 4} more</Text>}
-      {info && <Text style={styles.badge}>{info}</Text>}
+
+      {items.map((item) => (
+        <Text key={item.id} style={[styles.item, item.checked && styles.checked]} numberOfLines={1}>
+          {item.checked ? '☑ ' : '☐ '}
+          {item.text}
+        </Text>
+      ))}
+      {page.type === 'reminderList' && page.items.length > 4 && (
+        <Text style={styles.more}>+{page.items.length - 4} more</Text>
+      )}
+
+      <Text style={styles.badge}>{badge(page)}</Text>
       {page.archived && <Text style={styles.archivedTag}>Archived</Text>}
       {page.tags.length > 0 && (
         <Text style={styles.tags} numberOfLines={1}>
@@ -76,7 +77,6 @@ const styles = StyleSheet.create({
   archived: { opacity: 0.55 },
   title: { fontSize: 19, fontWeight: '700', color: UI.text, marginBottom: 8 },
   item: { fontSize: 13, color: UI.text, marginBottom: 2 },
-  itemNote: { fontSize: 11, color: UI.textMuted, marginLeft: 16, marginBottom: 2 },
   checked: { textDecorationLine: 'line-through', color: UI.textMuted },
   more: { fontSize: 12, color: UI.textMuted, marginTop: 2 },
   badge: { fontSize: 12, color: UI.textMuted, marginTop: 8 },

@@ -4,12 +4,11 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before 
 
 # TBKA (The Better Keeps App), formerly "Motivator"
 
-Google Keep-style app (Expo SDK 57 + expo-router + TypeScript; Android APK + web). Multi-user: accounts keyed by ID number + PIN (SHA-256 hash in `users/{idNumber}`, `email` field for reminders, entered once, session persists). Pages live in `users/{idNumber}/pages`. Three page types:
-- `list` — plain bullets, no reminders
-- `reminderList` — recurring checklist (daily/weekly/monthly times), fires while items unticked, ticks reset each period
-- `reminder` — once-off at `onceAt` datetime; auto-archives once past
+Google Keep-style app (Expo SDK 57 + expo-router + TypeScript; Android APK + web). Multi-user: accounts keyed by ID number + PIN (SHA-256 hash in `users/{idNumber}`, `email` field for reminders, entered once, session persists). Pages live in `users/{idNumber}/pages`. TWO page types:
+- `note` — a rich-text note (`body`, markdown: **bold** *italic* ==highlight== ~~strike~~ `# heading` `- bullet` `[text](url)`). Turn on `notifyEnabled` + set `onceAt` and it becomes a one-off reminder that fires/emails the body, then auto-archives once past.
+- `reminderList` — recurring checklist (daily/weekly/monthly times); each item has its own rich-text `note` block; fires while items unticked; ticks reset each period.
 
-Items have per-item notes (shown under the item). Pages have tags, color, and (reminder types) `sendPush`/`sendEmail` toggles. Detail screen has a view mode (tick + Edit button) and an edit mode. `archived` pages hidden from the grid unless "Show archived" is on. Push = local notifications on the installed Android app. Email = GitHub Actions cron (scripts/cron/) — see below.
+Legacy migration lives in docToPage (`src/lib/pages.ts`): old `list`→`note` (items folded into body bullets), old `reminder`→`note`+notify. Rich text: `src/components/RichText.tsx` (RichText renderer + RichTextEditor with a B/I/H/S/bullet/H1/link toolbar). Pages have tags, color, `sendPush`/`sendEmail`, `archived`. Detail screen = view mode (tick + Edit) / edit mode, centered card. Home has search + type filter (All/Notes/Reminders/Recurring) + tag filter. Push = local notifications on the installed Android app. Email = GitHub Actions cron (scripts/cron/).
 
 - Data model + CRUD: `src/lib/pages.ts`, types in `src/types.ts`
 - Period/reset logic (pure, Jest-tested): `src/lib/periods.ts` — `npm test`
@@ -25,16 +24,18 @@ Commands act on the default account (`scripts/manage.mjs set-user <idNumber>` on
 ```
 node scripts/manage.mjs list
 node scripts/manage.mjs show <page>
-node scripts/manage.mjs add-page "<title>" [--type list|reminderList|reminder] [--interval daily|weekly|monthly] [--at "2026-07-15 09:00"] [--items "a;b;c"] [--push on|off] [--email on|off] [--color yellow]
-node scripts/manage.mjs add-once "<title>" "2026-07-15 09:00"   # shortcut for a once-off reminder; resolve natural dates yourself
+node scripts/manage.mjs add-page "<title>" [--type note|reminderList] [--interval daily|weekly|monthly] [--items "a;b;c"] [--notify on] [--at "2026-07-15 09:00"] [--body "..."] [--push on|off] [--email on|off] [--color yellow]
+node scripts/manage.mjs add-note "<title>" [--body "..."]          # a plain note
+node scripts/manage.mjs add-once "<title>" "2026-07-15 09:00"      # a note with a one-off reminder; resolve natural dates yourself
+node scripts/manage.mjs set-body <page> "<markdown body>"          # note body
 node scripts/manage.mjs remove-page <page>
-node scripts/manage.mjs add-item <page> "<text>" [more...]
+node scripts/manage.mjs add-item <page> "<text>" [more...]         # reminderList only
 node scripts/manage.mjs remove-item <page> <textOrIndex>
 node scripts/manage.mjs check|uncheck <page> <textOrIndex>
 node scripts/manage.mjs set-item-note <page> <textOrIndex> "<note>"
 node scripts/manage.mjs tag|untag <page> <tag> [more...]
 node scripts/manage.mjs set-times <page> "08:00,18:00" | "mon@08:00,fri@17:00" | "1@08:00,15@18:00"
-node scripts/manage.mjs set-once <page> "2026-07-15 09:00"
+node scripts/manage.mjs set-once <page> "2026-07-15 09:00"         # turns a note into a one-off reminder
 node scripts/manage.mjs archive|unarchive <page>
 node scripts/manage.mjs notify <page> push|email on|off
 node scripts/manage.mjs set-email "you@example.com"            # this account's reminder email

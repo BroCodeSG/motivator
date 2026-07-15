@@ -68,18 +68,21 @@ function recentOccurrence(interval, t, now) {
   return new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + offsetFromMonday, t.hour, t.minute, 0, 0);
 }
 
+const plainText = (md) =>
+  (md ?? '').replace(/\*\*/g, '').replace(/==/g, '').replace(/~~/g, '').replace(/\*/g, '').replace(/^- /gm, '• ');
+
 // Returns { key, body } if the page is due for an email now, else null.
 function dueEmail(page, now) {
   const unchecked = (page.items ?? []).filter((i) => !i.checked);
   const bodyFrom = (items) =>
     items.map((i) => (i.note ? `• ${i.text} (${i.note})` : `• ${i.text}`)).join('\n') || page.title;
 
-  if (page.type === 'reminder') {
-    if (!page.onceAt) return null;
+  // Note with "Notify me" -> one-off reminder emailing the note body.
+  if (page.type === 'note') {
+    if (!page.notifyEnabled || !page.onceAt) return null;
     const at = new Date(page.onceAt);
     if (Number.isNaN(at.getTime()) || at.getTime() > now.getTime()) return null;
-    if ((page.items ?? []).length > 0 && unchecked.length === 0) return null;
-    return { key: `once:${page.onceAt}`, body: bodyFrom(unchecked.length ? unchecked : page.items ?? []) };
+    return { key: `once:${page.onceAt}`, body: plainText(page.body) || page.title };
   }
 
   if (page.type === 'reminderList' && page.reminder) {

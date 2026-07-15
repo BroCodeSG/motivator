@@ -108,19 +108,23 @@ export function reconcileAll(pages: Page[]): Promise<void> {
   return chain;
 }
 
+function plainText(md: string): string {
+  return md.replace(/\*\*/g, '').replace(/==/g, '').replace(/~~/g, '').replace(/\*/g, '').replace(/^- /gm, '• ');
+}
+
 async function doReconcile(pages: Page[]): Promise<void> {
   const Notifications = getNotifications();
   const now = new Date();
 
   // Maintenance that must run everywhere (including web, where notifications
   // are unavailable): period resets for recurring lists, and auto-archiving
-  // once-off reminders whose moment has passed.
+  // once-off note-reminders whose moment has passed.
   for (const page of pages) {
     if (page.type === 'reminderList' && page.reminder) {
       const periodKey = currentPeriodKey(page.reminder.interval, now);
       if (page.lastResetPeriodKey !== periodKey) applyReset(page, periodKey).catch(() => {});
     }
-    if (page.type === 'reminder' && page.onceAt && !page.archived) {
+    if (page.type === 'note' && page.notifyEnabled && page.onceAt && !page.archived) {
       const at = new Date(page.onceAt);
       if (!Number.isNaN(at.getTime()) && at.getTime() <= now.getTime()) {
         setArchived(page.id, true).catch(() => {});
@@ -133,17 +137,13 @@ async function doReconcile(pages: Page[]): Promise<void> {
   for (const page of pages) {
     if (page.archived || !page.sendPush) continue;
 
-    // Once-off reminder: a single DATE trigger, suppressed once the date has
-    // passed or (if it has items) every item is ticked.
-    if (page.type === 'reminder') {
-      if (!page.onceAt) continue;
+    // Note with "Notify me": a single DATE trigger firing with the note body.
+    if (page.type === 'note') {
+      if (!page.notifyEnabled || !page.onceAt) continue;
       const at = new Date(page.onceAt);
       if (Number.isNaN(at.getTime()) || at.getTime() <= now.getTime()) continue;
-      const unchecked = page.items.filter((i) => !i.checked);
-      if (page.items.length > 0 && unchecked.length === 0) continue;
-      const body = unchecked.map((i) => i.text).join(' • ') || page.title;
       await Notifications.scheduleNotificationAsync({
-        content: content(page, body),
+        content: content(page, plainText(page.body) || page.title),
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at },
       });
       continue;

@@ -153,21 +153,28 @@ function fmtTime(interval, t) {
 function printPage(doc) {
   const p = doc.data();
   let head;
-  if (p.type === 'reminder') head = `[reminder once: ${p.onceAt ? p.onceAt.replace('T', ' ') : 'no date'}]`;
-  else if (p.type === 'reminderList')
+  const notifying = [];
+  if (p.type === 'reminderList') {
     head = `[reminderList ${p.reminder?.interval}: ${(p.reminder?.times ?? []).map((t) => fmtTime(p.reminder.interval, t)).join(', ') || 'no times'}]`;
-  else head = '[list]';
-  const flags = [];
-  if (p.type !== 'list') {
-    if (p.sendPush ?? true) flags.push('push');
-    if (p.sendEmail) flags.push('email');
+  } else if (p.notifyEnabled) {
+    head = `[reminder once: ${p.onceAt ? p.onceAt.replace('T', ' ') : 'no date'}]`;
+  } else {
+    head = '[note]';
   }
-  if (p.archived) flags.push('ARCHIVED');
+  if (p.type === 'reminderList' || p.notifyEnabled) {
+    if (p.sendPush ?? true) notifying.push('push');
+    if (p.sendEmail) notifying.push('email');
+  }
+  if (p.archived) notifying.push('ARCHIVED');
   const tags = (p.tags ?? []).length ? ' ' + p.tags.map((t) => `#${t}`).join(' ') : '';
-  console.log(`${p.title || 'Untitled'} ${head}${flags.length ? ` {${flags.join(',')}}` : ''}${tags} (${p.color}, id ${doc.id})`);
-  (p.items ?? []).forEach((i, n) => {
-    console.log(`  ${n + 1}. ${p.type === 'list' ? '' : i.checked ? '[x] ' : '[ ] '}${i.text}${i.note ? `  — ${i.note}` : ''}`);
-  });
+  console.log(`${p.title || 'Untitled'} ${head}${notifying.length ? ` {${notifying.join(',')}}` : ''}${tags} (${p.color}, id ${doc.id})`);
+  if (p.type === 'note') {
+    if (p.body) console.log(`  ${p.body.replace(/\n/g, '\n  ')}`);
+  } else {
+    (p.items ?? []).forEach((i, n) => {
+      console.log(`  ${n + 1}. ${i.checked ? '[x] ' : '[ ] '}${i.text}${i.note ? `  — ${i.note.replace(/\n/g, ' ')}` : ''}`);
+    });
+  }
 }
 
 const setUpdated = (obj) => ({ ...obj, updatedAt: FieldValue.serverTimestamp() });
@@ -210,43 +217,52 @@ switch (cmd) {
     break;
 
   case 'add-page':
+  case 'add-note':
   case 'add-once': {
-    let title, type, interval, onceAt, color, itemsSpec;
+    // add-once: a note with a one-off reminder. add-note: a plain note.
+    // add-page --type note|reminderList.
+    let title, type, interval, onceAt, notifyEnabled, body, color, itemsSpec;
     if (cmd === 'add-once') {
       title = argv[0];
-      if (!title || !argv[1]) { console.error('Usage: add-once "<title>" "yyyy-mm-dd hh:mm"'); process.exit(1); }
-      type = 'reminder';
+      if (!title || !argv[1]) { console.error('Usage: add-once "<title>" "yyyy-mm-dd hh:mm" [--body "..."]'); process.exit(1); }
+      type = 'note';
+      notifyEnabled = true;
       onceAt = parseOnceAt(argv[1]);
       color = COLORS.includes(flags.color) ? flags.color : 'teal';
     } else {
       title = argv[0];
-      if (!title) { console.error('Usage: add-page "<title>" [--type ...] ...'); process.exit(1); }
-      type = ['list', 'reminderList', 'reminder'].includes(flags.type) ? flags.type : 'reminderList';
+      if (!title) { console.error('Usage: add-page "<title>" [--type note|reminderList] ...'); process.exit(1); }
+      type = flags.type === 'reminderList' ? 'reminderList' : cmd === 'add-note' ? 'note' : (flags.type === 'note' ? 'note' : 'reminderList');
       interval = ['daily', 'weekly', 'monthly'].includes(flags.interval) ? flags.interval : 'daily';
-      onceAt = type === 'reminder' ? parseOnceAt(flags.at) : null;
+      notifyEnabled = type === 'note' ? onFlag(flags.notify) : false;
+      onceAt = notifyEnabled ? parseOnceAt(flags.at) : null;
       color = COLORS.includes(flags.color) ? flags.color : 'yellow';
     }
-    itemsSpec = flags.items ? flags.items.split(';').map((s) => s.trim()).filter(Boolean) : [];
+    body = type === 'note' ? flags.body ?? '' : '';
+    itemsSpec = type === 'reminderList' && flags.items ? flags.items.split(';').map((s) => s.trim()).filter(Boolean) : [];
     const all = await col.get();
     const position = all.docs.reduce((m, d) => Math.max(m, d.data().position ?? 0), 0) + 1;
+    const notifies = type === 'reminderList' || notifyEnabled;
     const id = newId();
     await col.doc(id).set({
       title,
       type,
       color,
       position,
-      items: itemsSpec.map((text) => ({ id: newId(), text, checked: false, note: '' })),
       tags: [],
-      reminder: type === 'reminderList' ? { interval, times: [] } : null,
-      onceAt: type === 'reminder' ? onceAt : null,
-      sendPush: type === 'list' ? false : flags.push ? onFlag(flags.push) : true,
-      sendEmail: type === 'list' ? false : onFlag(flags.email),
       archived: false,
+      body,
+      notifyEnabled: type === 'note' ? notifyEnabled : false,
+      onceAt: type === 'note' ? onceAt : null,
+      items: itemsSpec.map((text) => ({ id: newId(), text, checked: false, note: '' })),
+      reminder: type === 'reminderList' ? { interval, times: [] } : null,
       lastResetPeriodKey: type === 'reminderList' ? currentPeriodKey(interval) : '',
+      sendPush: notifies ? (flags.push ? onFlag(flags.push) : true) : true,
+      sendEmail: notifies ? onFlag(flags.email) : false,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
-    console.log(`Created ${type} "${title}" (id ${id})`);
+    console.log(`Created ${type}${notifyEnabled ? ' (reminder)' : ''} "${title}" (id ${id})`);
     if (type === 'reminderList') console.log('Set times with: set-times');
     break;
   }
@@ -324,10 +340,18 @@ switch (cmd) {
   case 'set-once': {
     const doc = await findPage(col, argv[0]);
     const p = doc.data();
-    if (p.type !== 'reminder') { console.error(`"${p.title}" is not a once-off reminder.`); process.exit(1); }
+    if (p.type !== 'note') { console.error(`"${p.title}" is not a note.`); process.exit(1); }
     const onceAt = parseOnceAt(argv[1]);
-    await doc.ref.update(setUpdated({ onceAt, archived: false }));
-    console.log(`"${p.title}" reminds once at ${onceAt.replace('T', ' ')}`);
+    await doc.ref.update(setUpdated({ onceAt, notifyEnabled: true, archived: false }));
+    console.log(`"${p.title}" now reminds once at ${onceAt.replace('T', ' ')}`);
+    break;
+  }
+
+  case 'set-body': {
+    const doc = await findPage(col, argv[0]);
+    if (doc.data().type !== 'note') { console.error('set-body only applies to notes.'); process.exit(1); }
+    await doc.ref.update(setUpdated({ body: argv[1] ?? '' }));
+    console.log(`Body of "${doc.data().title}" updated`);
     break;
   }
 

@@ -1,16 +1,7 @@
 import { format } from 'date-fns';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ColorDots } from '@/components/ColorDots';
 import { OnceField } from '@/components/OnceField';
@@ -27,6 +18,7 @@ import {
   setColor,
   setItemNote,
   setItemText,
+  setNotifyEnabled,
   setOnceAt,
   setReminder,
   setSendEmail,
@@ -40,8 +32,7 @@ import { pageColor, UI } from '@/theme';
 import { PAGE_TYPE_LABEL, type IntervalType, type Page, type ReminderTime } from '@/types';
 
 const INTERVALS: IntervalType[] = ['daily', 'weekly', 'monthly'];
-const INTERVAL_RESET = { daily: 'day', weekly: 'week (Monday)', monthly: 'month (the 1st)' };
-const TYPE_ICON: Record<Page['type'], string> = { list: '📝', reminderList: '🔁', reminder: '🔔' };
+const TYPE_ICON: Record<Page['type'], string> = { note: '📝', reminderList: '🔁' };
 
 function defaultTime(interval: IntervalType): ReminderTime {
   if (interval === 'weekly') return { hour: 8, minute: 0, weekday: 2 };
@@ -49,16 +40,14 @@ function defaultTime(interval: IntervalType): ReminderTime {
   return { hour: 8, minute: 0 };
 }
 
-function reminderSummary(page: Page): string {
-  if (page.type === 'reminder') {
-    return page.onceAt ? `Once, ${format(new Date(page.onceAt), 'EEE d MMM yyyy, HH:mm')}` : 'Once — no date set';
+function summary(page: Page): string {
+  if (page.type === 'note') {
+    if (page.notifyEnabled && page.onceAt) return `🔔 ${format(new Date(page.onceAt), 'EEE d MMM, HH:mm')}`;
+    return '📝 Note';
   }
-  if (page.type === 'reminderList' && page.reminder) {
-    const r = page.reminder;
-    const label = r.interval.charAt(0).toUpperCase() + r.interval.slice(1);
-    return r.times.length ? `${label}, ${r.times.length} time(s)` : `${label} — no times set`;
-  }
-  return '';
+  const r = page.reminder;
+  const label = r ? r.interval.charAt(0).toUpperCase() + r.interval.slice(1) : 'Daily';
+  return `🔁 ${label}${r?.times.length ? ` · ${r.times.length} time(s)` : ' · no times'}`;
 }
 
 export default function PageDetailScreen() {
@@ -79,8 +68,6 @@ export default function PageDetailScreen() {
       </View>
     );
   }
-
-  const checkable = page.type === 'reminder' || page.type === 'reminderList';
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -105,19 +92,14 @@ export default function PageDetailScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.card}>
-          {editing ? (
-            <EditView page={page} checkable={checkable} allTags={allTags} />
-          ) : (
-            <ReadView page={page} checkable={checkable} />
-          )}
+          {editing ? <EditView page={page} allTags={allTags} /> : <ReadView page={page} />}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-// ---- Read-only view: tick items, read notes, tap Edit for everything else ----
-function ReadView({ page, checkable }: { page: Page; checkable: boolean }) {
+function ReadView({ page }: { page: Page }) {
   return (
     <>
       <Text style={styles.title}>{page.title || 'Untitled'}</Text>
@@ -131,32 +113,34 @@ function ReadView({ page, checkable }: { page: Page; checkable: boolean }) {
         </View>
       )}
 
-      <Text style={styles.summary}>
-        {TYPE_ICON[page.type]} {PAGE_TYPE_LABEL[page.type]}
-        {checkable ? ` · ${reminderSummary(page)}` : ''}
-      </Text>
+      <Text style={styles.summary}>{summary(page)}</Text>
 
-      {page.items.length === 0 && page.body === '' && (
-        <Text style={styles.hint}>Empty. Tap Edit to add items or a note.</Text>
+      {page.type === 'note' ? (
+        page.body !== '' ? (
+          <RichText value={page.body} />
+        ) : (
+          <Text style={styles.hint}>Empty note. Tap Edit to write something.</Text>
+        )
+      ) : (
+        <>
+          {page.items.length === 0 && <Text style={styles.hint}>No items. Tap Edit to add some.</Text>}
+          {page.items.map((item) => (
+            <View key={item.id} style={styles.readItem}>
+              <View style={styles.itemRow}>
+                <Pressable hitSlop={8} onPress={() => toggleItem(page, item.id)}>
+                  <Text style={styles.checkbox}>{item.checked ? '☑' : '☐'}</Text>
+                </Pressable>
+                <Text style={[styles.itemText, item.checked && styles.checkedText]}>{item.text}</Text>
+              </View>
+              {item.note !== '' && (
+                <View style={styles.itemNoteBox}>
+                  <RichText value={item.note} style={styles.itemNoteText} />
+                </View>
+              )}
+            </View>
+          ))}
+        </>
       )}
-
-      {page.items.map((item) => (
-        <View key={item.id} style={styles.readItem}>
-          <View style={styles.itemRow}>
-            {checkable ? (
-              <Pressable hitSlop={8} onPress={() => toggleItem(page, item.id)}>
-                <Text style={styles.checkbox}>{item.checked ? '☑' : '☐'}</Text>
-              </Pressable>
-            ) : (
-              <Text style={styles.bullet}>•</Text>
-            )}
-            <Text style={[styles.itemText, item.checked && styles.checkedText]}>{item.text}</Text>
-          </View>
-          {item.note !== '' && <Text style={styles.itemNote}>{item.note}</Text>}
-        </View>
-      ))}
-
-      {page.body !== '' && <RichText value={page.body} style={styles.readBody} />}
 
       {page.tags.length > 0 && (
         <View style={styles.readTags}>
@@ -171,21 +155,13 @@ function ReadView({ page, checkable }: { page: Page; checkable: boolean }) {
   );
 }
 
-// ---- Edit view: everything is editable ----
-function EditView({ page, checkable, allTags }: { page: Page; checkable: boolean; allTags: string[] }) {
+function EditView({ page, allTags }: { page: Page; allTags: string[] }) {
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [newItem, setNewItem] = useState('');
 
   const commitTitle = () => {
     if (titleDraft !== null && titleDraft.trim() !== page.title) setTitle(page.id, titleDraft.trim());
     setTitleDraft(null);
-  };
-
-  const submitNewItem = () => {
-    const text = newItem.trim();
-    if (!text) return;
-    addItem(page, text);
-    setNewItem('');
   };
 
   const changeInterval = (interval: IntervalType) => {
@@ -214,6 +190,13 @@ function EditView({ page, checkable, allTags }: { page: Page; checkable: boolean
     );
   };
 
+  const submitNewItem = () => {
+    const text = newItem.trim();
+    if (!text) return;
+    addItem(page, text);
+    setNewItem('');
+  };
+
   return (
     <>
       <Text style={styles.editingLabel}>
@@ -229,125 +212,87 @@ function EditView({ page, checkable, allTags }: { page: Page; checkable: boolean
         onBlur={commitTitle}
       />
 
-      {page.items.map((item) => (
-        <View key={item.id} style={styles.editItem}>
-          <View style={styles.itemRow}>
-            {checkable ? (
-              <Pressable hitSlop={8} onPress={() => toggleItem(page, item.id)}>
-                <Text style={styles.checkbox}>{item.checked ? '☑' : '☐'}</Text>
-              </Pressable>
-            ) : (
-              <Text style={styles.bullet}>•</Text>
+      {page.type === 'note' && (
+        <>
+          <RichTextEditor value={page.body} onCommit={(t) => t !== page.body && setBody(page.id, t)} placeholder="Write your note…" />
+          <View style={styles.section}>
+            <Toggle label="🔔 Notify me" value={page.notifyEnabled} onChange={(v) => setNotifyEnabled(page.id, v)} />
+            {page.notifyEnabled && (
+              <>
+                <OnceField value={page.onceAt} onChange={(v) => setOnceAt(page.id, v)} />
+                <Toggle label="Phone notification" value={page.sendPush} onChange={(v) => setSendPush(page.id, v)} />
+                <Toggle label="Email" value={page.sendEmail} onChange={(v) => setSendEmail(page.id, v)} />
+                {page.sendEmail && <Text style={styles.hint}>Sent to the email in Settings.</Text>}
+                <Text style={styles.hint}>Fires once at that time with the note, then archives itself.</Text>
+              </>
             )}
-            <DraftInput
-              style={[styles.itemInput, item.checked && styles.checkedText]}
-              value={item.text}
-              onCommit={(text) => {
-                if (text.trim() && text.trim() !== item.text) setItemText(page, item.id, text.trim());
-              }}
-            />
-            <Pressable hitSlop={10} onPress={() => removeItem(page, item.id)}>
-              <Text style={styles.remove}>✕</Text>
-            </Pressable>
           </View>
-          <DraftInput
-            style={styles.noteInput}
-            value={item.note}
-            placeholder="Add note…"
-            onCommit={(note) => {
-              if (note !== item.note) setItemNote(page, item.id, note.trim());
-            }}
-          />
-        </View>
-      ))}
-
-      <View style={[styles.itemRow, styles.addRow]}>
-        <Text style={styles.checkbox}>{checkable ? '☐' : '•'}</Text>
-        <TextInput
-          style={styles.itemInput}
-          placeholder="Add item"
-          placeholderTextColor={UI.textMuted}
-          value={newItem}
-          onChangeText={setNewItem}
-          onSubmitEditing={submitNewItem}
-          blurOnSubmit={false}
-          returnKeyType="done"
-        />
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Note</Text>
-        <RichTextEditor
-          value={page.body}
-          onCommit={(text) => {
-            if (text !== page.body) setBody(page.id, text);
-          }}
-          placeholder="Write a note… (B/I for bold/italic)"
-        />
-      </View>
+        </>
+      )}
 
       {page.type === 'reminderList' && page.reminder && (
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Repeat</Text>
-          <View style={styles.segment}>
-            {INTERVALS.map((i) => {
-              const active = page.reminder!.interval === i;
-              return (
-                <Pressable
-                  key={i}
-                  style={[styles.segmentButton, active && styles.segmentActive]}
-                  onPress={() => changeInterval(i)}
-                >
-                  <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{i}</Text>
-                </Pressable>
-              );
-            })}
+        <>
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Repeat</Text>
+            <View style={styles.segment}>
+              {INTERVALS.map((i) => {
+                const active = page.reminder!.interval === i;
+                return (
+                  <Pressable key={i} style={[styles.segmentButton, active && styles.segmentActive]} onPress={() => changeInterval(i)}>
+                    <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{i}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {page.reminder.times.map((t, i) => (
+              <TimeRow key={i} interval={page.reminder!.interval} time={t} onChange={(next) => changeTime(i, next)} onRemove={() => changeTime(i, null)} />
+            ))}
+            <Pressable onPress={addTime}>
+              <Text style={styles.addLink}>＋ Add time</Text>
+            </Pressable>
+            <Toggle label="Phone notification" value={page.sendPush} onChange={(v) => setSendPush(page.id, v)} />
+            <Toggle label="Email" value={page.sendEmail} onChange={(v) => setSendEmail(page.id, v)} />
           </View>
-          {page.reminder.times.map((t, i) => (
-            <TimeRow
-              key={i}
-              interval={page.reminder!.interval}
-              time={t}
-              onChange={(next) => changeTime(i, next)}
-              onRemove={() => changeTime(i, null)}
-            />
-          ))}
-          <Pressable onPress={addTime}>
-            <Text style={styles.addTime}>＋ Add time</Text>
-          </Pressable>
-          <Text style={styles.hint}>
-            Reminds you while items are unticked. Ticks reset each {INTERVAL_RESET[page.reminder.interval]}.
-          </Text>
-        </View>
-      )}
 
-      {page.type === 'reminder' && (
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Remind me at</Text>
-          <OnceField value={page.onceAt} onChange={(v) => setOnceAt(page.id, v)} />
-          <Text style={styles.hint}>Reminds you once, then archives itself. Ticking all items cancels it.</Text>
-          <Pressable
-            onPress={() =>
-              confirmAction(
-                page.archived ? 'Restore reminder' : 'Archive reminder',
-                page.archived ? 'Move this back to your active pages?' : 'Move this to the archive now?',
-                page.archived ? 'Restore' : 'Archive',
-                () => setArchived(page.id, !page.archived)
-              )
-            }
-          >
-            <Text style={styles.link}>{page.archived ? 'Restore from archive' : 'Archive now'}</Text>
-          </Pressable>
-        </View>
-      )}
-
-      {checkable && (
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Notify by</Text>
-          <Toggle label="🔔 Phone notification" value={page.sendPush} onChange={(v) => setSendPush(page.id, v)} />
-          <Toggle label="✉️ Email" value={page.sendEmail} onChange={(v) => setSendEmail(page.id, v)} />
-          {page.sendEmail && <Text style={styles.hint}>Sent to the email address in Settings.</Text>}
-        </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Items</Text>
+            {page.items.map((item) => (
+              <View key={item.id} style={styles.itemBlock}>
+                <View style={styles.itemHeaderRow}>
+                  <Pressable hitSlop={8} onPress={() => toggleItem(page, item.id)}>
+                    <Text style={styles.checkbox}>{item.checked ? '☑' : '☐'}</Text>
+                  </Pressable>
+                  <DraftInput
+                    style={[styles.itemInput, item.checked && styles.checkedText]}
+                    value={item.text}
+                    onCommit={(text) => text.trim() && text.trim() !== item.text && setItemText(page, item.id, text.trim())}
+                  />
+                  <Pressable hitSlop={10} onPress={() => removeItem(page, item.id)}>
+                    <Text style={styles.remove}>✕</Text>
+                  </Pressable>
+                </View>
+                <RichTextEditor
+                  value={item.note}
+                  onCommit={(note) => note !== item.note && setItemNote(page, item.id, note)}
+                  placeholder="Note for this item…"
+                />
+              </View>
+            ))}
+            <View style={[styles.itemHeaderRow, styles.addRow]}>
+              <Text style={styles.checkbox}>☐</Text>
+              <TextInput
+                style={styles.itemInput}
+                placeholder="Add item"
+                placeholderTextColor={UI.textMuted}
+                value={newItem}
+                onChangeText={setNewItem}
+                onSubmitEditing={submitNewItem}
+                blurOnSubmit={false}
+                returnKeyType="done"
+              />
+            </View>
+          </View>
+        </>
       )}
 
       <View style={styles.section}>
@@ -359,105 +304,70 @@ function EditView({ page, checkable, allTags }: { page: Page; checkable: boolean
         <Text style={styles.sectionLabel}>Color</Text>
         <ColorDots selected={page.color} onSelect={(c) => setColor(page.id, c)} />
       </View>
+
+      <Pressable
+        style={styles.deleteRow}
+        onPress={() =>
+          confirmAction(
+            page.archived ? 'Restore' : 'Archive',
+            page.archived ? 'Move back to your active pages?' : 'Move to the archive?',
+            page.archived ? 'Restore' : 'Archive',
+            () => setArchived(page.id, !page.archived)
+          )
+        }
+      >
+        <Text style={styles.link}>{page.archived ? 'Restore from archive' : 'Archive this page'}</Text>
+      </Pressable>
     </>
   );
 }
 
-// Text input that keeps a local draft and commits on blur (onEndEditing does
-// not fire on web).
-function DraftInput({
-  value,
-  onCommit,
-  style,
-  placeholder,
-}: {
-  value: string;
-  onCommit: (text: string) => void;
-  style: any;
-  placeholder?: string;
-}) {
+function DraftInput({ value, onCommit, style }: { value: string; onCommit: (t: string) => void; style: any }) {
   const [draft, setDraft] = useState<string | null>(null);
   const commit = () => {
     if (draft !== null) onCommit(draft);
     setDraft(null);
   };
   return (
-    <TextInput
-      style={style}
-      value={draft ?? value}
-      placeholder={placeholder}
-      placeholderTextColor={UI.textMuted}
-      onChangeText={setDraft}
-      onEndEditing={commit}
-      onBlur={commit}
-      multiline
-    />
+    <TextInput style={style} value={draft ?? value} onChangeText={setDraft} onEndEditing={commit} onBlur={commit} multiline />
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 20, paddingBottom: 60, alignItems: 'center' },
-  card: { width: '100%', maxWidth: 680 },
+  card: { width: '100%', maxWidth: 640 },
   missing: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   headerButton: { color: UI.accent, fontSize: 16, fontWeight: '600', paddingHorizontal: 14 },
-  title: { fontSize: 24, fontWeight: '700', color: UI.text, marginBottom: 10 },
+  title: { fontSize: 24, fontWeight: '700', color: UI.text, marginBottom: 8 },
   titleInput: { fontSize: 22, fontWeight: '600', color: UI.text, paddingVertical: 6, marginBottom: 10 },
-  summary: { fontSize: 13, color: UI.textMuted, marginBottom: 14 },
   editingLabel: { fontSize: 12, color: UI.textMuted, fontWeight: '600', textTransform: 'uppercase', marginBottom: 6 },
-  readBody: { marginTop: 14 },
-  archivedBanner: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
-  },
+  summary: { fontSize: 13, color: UI.textMuted, marginBottom: 14 },
+  archivedBanner: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: 10, marginBottom: 12 },
   archivedText: { color: UI.text, fontWeight: '600' },
   link: { color: UI.accent, fontWeight: '600', paddingVertical: 4 },
-  readItem: { marginBottom: 8 },
-  editItem: {
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: UI.border,
-    borderRadius: 8,
-    padding: 8,
-    backgroundColor: 'rgba(0,0,0,0.12)',
-  },
-  addRow: {
-    borderWidth: 1,
-    borderColor: UI.border,
-    borderStyle: 'dashed',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-  },
+  readItem: { marginBottom: 10 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
   checkbox: { fontSize: 20, color: UI.text },
-  bullet: { fontSize: 16, color: UI.textMuted, width: 20, textAlign: 'center' },
   itemText: { flex: 1, fontSize: 16, color: UI.text },
   itemInput: { flex: 1, fontSize: 16, color: UI.text, paddingVertical: 6 },
-  itemNote: { fontSize: 13, color: UI.textMuted, marginLeft: 30, marginTop: 2 },
-  noteInput: { fontSize: 13, color: UI.textMuted, marginLeft: 30, paddingVertical: 2 },
+  itemNoteBox: { marginLeft: 30, marginTop: 2 },
+  itemNoteText: { fontSize: 13, color: UI.textMuted },
   checkedText: { textDecorationLine: 'line-through', color: UI.textMuted },
   remove: { color: UI.textMuted, fontSize: 14, paddingHorizontal: 4 },
-  section: { marginTop: 26, gap: 8 },
+  section: { marginTop: 22, gap: 8 },
   sectionLabel: { fontSize: 13, color: UI.textMuted, fontWeight: '600', textTransform: 'uppercase' },
   segment: { flexDirection: 'row', gap: 8 },
-  segmentButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: UI.border,
-    borderRadius: 8,
-    padding: 10,
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)',
-  },
+  segmentButton: { flex: 1, borderWidth: 1, borderColor: UI.border, borderRadius: 8, padding: 10, alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' },
   segmentActive: { backgroundColor: 'rgba(0,0,0,0.4)', borderColor: UI.accent },
   segmentText: { color: UI.textMuted, textTransform: 'capitalize' },
   segmentTextActive: { color: UI.accent, fontWeight: '600' },
-  addTime: { color: UI.accent, fontWeight: '600', paddingVertical: 6 },
+  itemBlock: { borderWidth: 1, borderColor: UI.border, borderRadius: 10, padding: 10, gap: 8, marginBottom: 6, backgroundColor: 'rgba(0,0,0,0.12)' },
+  itemHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  addRow: { borderWidth: 1, borderColor: UI.border, borderStyle: 'dashed', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  addLink: { color: UI.accent, fontWeight: '600', paddingVertical: 6 },
   hint: { fontSize: 12, color: UI.textMuted },
   readTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 18 },
   readTag: { fontSize: 13, color: UI.textMuted },
+  deleteRow: { marginTop: 24, alignItems: 'center' },
 });
