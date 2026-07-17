@@ -57,6 +57,7 @@ function docToPage(id: string, data: any): Page {
     reminder = null;
   };
 
+  let checklist = false;
   if (raw === 'reminderList') {
     type = 'reminderList';
     reminder = reminder ? { interval: reminder.interval, times: Array.isArray(reminder.times) ? reminder.times : [] } : { interval: 'daily', times: [] };
@@ -67,7 +68,9 @@ function docToPage(id: string, data: any): Page {
   } else {
     // 'list', 'note', or unknown
     type = 'note';
-    foldItemsIntoBody();
+    checklist = !!data.checklist;
+    if (checklist) reminder = null;
+    else foldItemsIntoBody();
   }
 
   return {
@@ -78,7 +81,9 @@ function docToPage(id: string, data: any): Page {
     position: data.position ?? 0,
     tags: Array.isArray(data.tags) ? data.tags : [],
     archived: !!data.archived,
+    archivedAt: data.archivedAt ?? null,
     body: ensureHtml(body),
+    checklist,
     notifyEnabled,
     onceAt,
     items,
@@ -124,15 +129,18 @@ export async function createPage(opts: {
   interval?: IntervalType;
   times?: ReminderTime[];
   items?: { text: string; note?: string }[];
+  checklist?: boolean;
   sendEmail?: boolean;
   sendPush?: boolean;
 }): Promise<string> {
   const id = newItemId();
   const isList = opts.type === 'reminderList';
+  const checklist = opts.type === 'note' && !!opts.checklist;
+  const hasItems = isList || checklist;
   const reminder: ReminderConfig | null = isList
     ? { interval: opts.interval ?? 'daily', times: opts.times ?? [] }
     : null;
-  const items: Item[] = isList
+  const items: Item[] = hasItems
     ? (opts.items ?? [])
         .filter((i) => i.text.trim())
         .map((i) => ({ id: newItemId(), text: i.text.trim(), checked: false, note: i.note ?? '' }))
@@ -145,7 +153,9 @@ export async function createPage(opts: {
     position: opts.position,
     tags: [],
     archived: false,
-    body: isList ? '' : opts.body ?? '',
+    archivedAt: null,
+    body: isList || checklist ? '' : opts.body ?? '',
+    checklist,
     notifyEnabled: isList ? false : !!opts.notifyEnabled,
     onceAt: isList ? null : opts.onceAt ?? null,
     items,
@@ -172,9 +182,22 @@ export const setColor = (id: string, color: string) => update(id, { color });
 export const setItems = (id: string, items: Item[]) => update(id, { items });
 export const setTags = (id: string, tags: string[]) => update(id, { tags });
 export const setBody = (id: string, body: string) => update(id, { body });
+export const setChecklist = (id: string, checklist: boolean) => update(id, { checklist });
 export const setOnceAt = (id: string, onceAt: string) => update(id, { onceAt });
 export const setNotifyEnabled = (id: string, notifyEnabled: boolean) => update(id, { notifyEnabled });
-export const setArchived = (id: string, archived: boolean) => update(id, { archived });
+export const setArchived = (id: string, archived: boolean) =>
+  update(id, { archived, archivedAt: archived ? new Date().toISOString() : null });
+
+// Permanently delete archived pages older than the retention window.
+export async function deleteExpiredArchived(pages: Page[], retentionMonths: number): Promise<void> {
+  if (!retentionMonths || retentionMonths <= 0) return;
+  const cutoff = Date.now() - retentionMonths * 30 * 24 * 60 * 60 * 1000;
+  for (const p of pages) {
+    if (p.archived && p.archivedAt && new Date(p.archivedAt).getTime() < cutoff) {
+      await deletePage(p.id).catch(() => {});
+    }
+  }
+}
 export const setSendEmail = (id: string, sendEmail: boolean) => update(id, { sendEmail });
 export const setSendPush = (id: string, sendPush: boolean) => update(id, { sendPush });
 

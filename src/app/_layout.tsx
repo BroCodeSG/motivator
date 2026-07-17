@@ -58,7 +58,10 @@ function Root() {
       >
         <Stack.Screen name="index" options={{ title: 'TBKA' }} />
         <Stack.Screen name="page/new" options={{ title: 'New page', presentation: 'modal' }} />
-        <Stack.Screen name="page/[id]" options={{ title: '' }} />
+        <Stack.Screen
+          name="page/[id]"
+          options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }}
+        />
       </Stack>
     </PagesProvider>
   );

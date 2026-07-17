@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -16,6 +16,7 @@ import {
   removeItem,
   setArchived,
   setBody,
+  setChecklist,
   setColor,
   setItemNote,
   setItemText,
@@ -52,84 +53,77 @@ function summary(page: Page): string {
 }
 
 export default function PageDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
   const page = usePage(id);
   const { pages } = usePages();
   const router = useRouter();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(edit === '1');
   const allTags = [...new Set(pages.flatMap((p) => p.tags))].sort();
 
-  if (!page) {
-    return (
-      <View style={styles.missing}>
-        <Text style={{ color: UI.textMuted }}>This page no longer exists.</Text>
-        <Pressable onPress={() => router.back()}>
-          <Text style={{ color: UI.accent, marginTop: 8 }}>Go back</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  const close = () => {
+    (globalThis as any).document?.activeElement?.blur?.();
+    router.back();
+  };
+  const toggleEdit = () => {
+    if (editing) (globalThis as any).document?.activeElement?.blur?.();
+    setEditing((e) => !e);
+  };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Stack.Screen
-        options={{
-          headerStyle: { backgroundColor: pageColor(page.color) },
-          headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={10}>
-              <Text style={styles.headerButton}>‹ Back</Text>
+    <View style={styles.backdrop}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={close} />
+      <KeyboardAvoidingView style={styles.modalWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[styles.modalCard, { backgroundColor: page ? pageColor(page.color) : UI.surface }]}>
+          <View style={styles.topBar}>
+            <Pressable onPress={close} hitSlop={10}>
+              <Text style={styles.headerButton}>✕</Text>
             </Pressable>
-          ),
-          headerRight: () => (
-            <Pressable
-              onPress={() => {
-                // Flush any focused rich-text editor (its onCommit fires on blur) before leaving edit mode.
-                if (editing) (globalThis as any).document?.activeElement?.blur?.();
-                setEditing((e) => !e);
-              }}
-              hitSlop={10}
-            >
-              <Text style={styles.headerButton}>{editing ? 'Done' : 'Edit'}</Text>
-            </Pressable>
-          ),
-        }}
-      />
-      <ScrollView
-        style={[styles.container, { backgroundColor: pageColor(page.color) }]}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.card}>
-          {editing ? <EditView page={page} allTags={allTags} /> : <ReadView page={page} />}
+            {page && (
+              <Pressable onPress={toggleEdit} hitSlop={10}>
+                <Text style={styles.headerButton}>{editing ? 'Done' : 'Edit'}</Text>
+              </Pressable>
+            )}
+          </View>
+          {!page ? (
+            <View style={styles.missing}>
+              <Text style={{ color: UI.textMuted }}>This page no longer exists.</Text>
+            </View>
+          ) : (
+            <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+              {editing ? <EditView page={page} allTags={allTags} /> : <ReadView page={page} />}
+            </ScrollView>
+          )}
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 function ReadView({ page }: { page: Page }) {
+  const showItems = page.type === 'reminderList' || (page.type === 'note' && page.checklist);
   return (
     <>
       <Text style={styles.title}>{page.title || 'Untitled'}</Text>
 
-      {page.archived && (
+      {page.archived ? (
         <View style={styles.archivedBanner}>
           <Text style={styles.archivedText}>Archived</Text>
           <Pressable onPress={() => setArchived(page.id, false)}>
             <Text style={styles.link}>Restore</Text>
           </Pressable>
         </View>
+      ) : (
+        <View style={styles.viewActions}>
+          <Pressable onPress={() => setArchived(page.id, true)}>
+            <Text style={styles.link}>Archive</Text>
+          </Pressable>
+        </View>
       )}
 
-      <Text style={styles.summary}>{summary(page)}</Text>
+      {/* Note reminders show the time up top; recurring lists show the schedule below the items. */}
+      {page.type === 'note' && page.notifyEnabled && <Text style={styles.summary}>{summary(page)}</Text>}
 
-      {page.type === 'note' ? (
-        page.body !== '' ? (
-          <RichHtml value={page.body} />
-        ) : (
-          <Text style={styles.hint}>Empty note. Tap Edit to write something.</Text>
-        )
-      ) : (
+      {showItems ? (
         <>
           {page.items.length === 0 && <Text style={styles.hint}>No items. Tap Edit to add some.</Text>}
           {page.items.map((item) => (
@@ -148,7 +142,13 @@ function ReadView({ page }: { page: Page }) {
             </View>
           ))}
         </>
+      ) : page.body !== '' ? (
+        <RichHtml value={page.body} />
+      ) : (
+        <Text style={styles.hint}>Empty note. Tap Edit to write something.</Text>
       )}
+
+      {page.type === 'reminderList' && <Text style={styles.summaryUnder}>{summary(page)}</Text>}
 
       {page.tags.length > 0 && (
         <View style={styles.readTags}>
@@ -205,6 +205,46 @@ function EditView({ page, allTags }: { page: Page; allTags: string[] }) {
     setNewItem('');
   };
 
+  const renderItems = () => (
+    <>
+      {page.items.map((item) => (
+        <View key={item.id} style={styles.itemBlock}>
+          <View style={styles.itemHeaderRow}>
+            <Pressable hitSlop={8} onPress={() => toggleItem(page, item.id)}>
+              <Text style={styles.checkbox}>{item.checked ? '☑' : '☐'}</Text>
+            </Pressable>
+            <DraftInput
+              style={[styles.itemInput, item.checked && styles.checkedText]}
+              value={item.text}
+              onCommit={(text) => text.trim() && text.trim() !== item.text && setItemText(page, item.id, text.trim())}
+            />
+            <Pressable hitSlop={10} onPress={() => removeItem(page, item.id)}>
+              <Text style={styles.remove}>✕</Text>
+            </Pressable>
+          </View>
+          <RichHtmlEditor
+            value={item.note}
+            onCommit={(note) => note !== item.note && setItemNote(page, item.id, note)}
+            placeholder="Note for this item…"
+          />
+        </View>
+      ))}
+      <View style={[styles.itemHeaderRow, styles.addRow]}>
+        <Text style={styles.checkbox}>☐</Text>
+        <TextInput
+          style={styles.itemInput}
+          placeholder="Add item"
+          placeholderTextColor={UI.textMuted}
+          value={newItem}
+          onChangeText={setNewItem}
+          onSubmitEditing={submitNewItem}
+          blurOnSubmit={false}
+          returnKeyType="done"
+        />
+      </View>
+    </>
+  );
+
   return (
     <>
       <Text style={styles.editingLabel}>
@@ -222,7 +262,21 @@ function EditView({ page, allTags }: { page: Page; allTags: string[] }) {
 
       {page.type === 'note' && (
         <>
-          <RichHtmlEditor value={page.body} onCommit={(t) => t !== page.body && setBody(page.id, t)} placeholder="Write your note…" />
+          <View style={styles.segment}>
+            <Pressable style={[styles.segmentButton, !page.checklist && styles.segmentActive]} onPress={() => page.checklist && setChecklist(page.id, false)}>
+              <Text style={[styles.segmentText, !page.checklist && styles.segmentTextActive]}>Text</Text>
+            </Pressable>
+            <Pressable style={[styles.segmentButton, page.checklist && styles.segmentActive]} onPress={() => !page.checklist && setChecklist(page.id, true)}>
+              <Text style={[styles.segmentText, page.checklist && styles.segmentTextActive]}>☑ Checklist</Text>
+            </Pressable>
+          </View>
+
+          {page.checklist ? (
+            renderItems()
+          ) : (
+            <RichHtmlEditor value={page.body} onCommit={(t) => t !== page.body && setBody(page.id, t)} placeholder="Write your note…" />
+          )}
+
           <View style={styles.section}>
             <Toggle label="🔔 Notify me" value={page.notifyEnabled} onChange={(v) => setNotifyEnabled(page.id, v)} />
             {page.notifyEnabled && (
@@ -264,41 +318,7 @@ function EditView({ page, allTags }: { page: Page; allTags: string[] }) {
 
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Items</Text>
-            {page.items.map((item) => (
-              <View key={item.id} style={styles.itemBlock}>
-                <View style={styles.itemHeaderRow}>
-                  <Pressable hitSlop={8} onPress={() => toggleItem(page, item.id)}>
-                    <Text style={styles.checkbox}>{item.checked ? '☑' : '☐'}</Text>
-                  </Pressable>
-                  <DraftInput
-                    style={[styles.itemInput, item.checked && styles.checkedText]}
-                    value={item.text}
-                    onCommit={(text) => text.trim() && text.trim() !== item.text && setItemText(page, item.id, text.trim())}
-                  />
-                  <Pressable hitSlop={10} onPress={() => removeItem(page, item.id)}>
-                    <Text style={styles.remove}>✕</Text>
-                  </Pressable>
-                </View>
-                <RichHtmlEditor
-                  value={item.note}
-                  onCommit={(note) => note !== item.note && setItemNote(page, item.id, note)}
-                  placeholder="Note for this item…"
-                />
-              </View>
-            ))}
-            <View style={[styles.itemHeaderRow, styles.addRow]}>
-              <Text style={styles.checkbox}>☐</Text>
-              <TextInput
-                style={styles.itemInput}
-                placeholder="Add item"
-                placeholderTextColor={UI.textMuted}
-                value={newItem}
-                onChangeText={setNewItem}
-                onSubmitEditing={submitNewItem}
-                blurOnSubmit={false}
-                returnKeyType="done"
-              />
-            </View>
+            {renderItems()}
           </View>
         </>
       )}
@@ -342,15 +362,19 @@ function DraftInput({ value, onCommit, style }: { value: string; onCommit: (t: s
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 20, paddingBottom: 60, alignItems: 'center' },
-  card: { width: '100%', maxWidth: 640 },
-  missing: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  headerButton: { color: UI.accent, fontSize: 16, fontWeight: '600', paddingHorizontal: 14 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  modalWrap: { width: '100%', maxWidth: 620, maxHeight: '90%' },
+  modalCard: { borderRadius: 16, overflow: 'hidden', maxHeight: '100%' },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, paddingTop: 10 },
+  modalContent: { padding: 20, paddingTop: 8 },
+  missing: { padding: 40, alignItems: 'center' },
+  headerButton: { color: UI.accent, fontSize: 16, fontWeight: '600', paddingHorizontal: 12, paddingVertical: 4 },
   title: { fontSize: 24, fontWeight: '700', color: UI.text, marginBottom: 8 },
   titleInput: { fontSize: 22, fontWeight: '600', color: UI.text, paddingVertical: 6, marginBottom: 10 },
   editingLabel: { fontSize: 12, color: UI.textMuted, fontWeight: '600', textTransform: 'uppercase', marginBottom: 6 },
   summary: { fontSize: 13, color: UI.textMuted, marginBottom: 14 },
+  summaryUnder: { fontSize: 13, color: UI.textMuted, marginTop: 16 },
+  viewActions: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8 },
   archivedBanner: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: 10, marginBottom: 12 },
   archivedText: { color: UI.text, fontWeight: '600' },
   link: { color: UI.accent, fontWeight: '600', paddingVertical: 4 },

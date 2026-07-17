@@ -42,3 +42,14 @@ export async function getUserEmail(idNumber: string): Promise<string> {
 export async function setUserEmail(idNumber: string, email: string): Promise<void> {
   await updateDoc(doc(db, 'users', idNumber), { email });
 }
+
+// How long archived pages are kept before auto-deletion (months). Default 3.
+export async function getRetentionMonths(idNumber: string): Promise<number> {
+  const snap = await getDoc(doc(db, 'users', idNumber));
+  const v = snap.exists() ? snap.data().retentionMonths : undefined;
+  return typeof v === 'number' && v > 0 ? v : 3;
+}
+
+export async function setRetentionMonths(idNumber: string, months: number): Promise<void> {
+  await updateDoc(doc(db, 'users', idNumber), { retentionMonths: months });
+}

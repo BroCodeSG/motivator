@@ -37,8 +37,11 @@ export interface Page {
 
   // note
   body: string;
+  checklist: boolean; // note shows a tick-box list (items) instead of a text body
   notifyEnabled: boolean; // note becomes a one-off reminder when true
   onceAt: string | null; // local "yyyy-MM-ddTHH:mm"
+
+  archivedAt: string | null; // ISO time a page was archived (for auto-cleanup)
 
   // reminderList
   items: Item[];

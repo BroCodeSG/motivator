@@ -39,12 +39,14 @@ export default function NewPageScreen() {
   const [interval, setInterval] = useState<IntervalType>('daily');
   const [times, setTimes] = useState<ReminderTime[]>([]);
   const [items, setItems] = useState<DraftItem[]>([{ id: newItemId(), text: '', note: '' }]);
+  const [checklist, setChecklist] = useState(false); // note sub-style: tick-box note
   const [color, setColor] = useState(DEFAULT_COLOR);
   const [sendPush, setSendPush] = useState(true);
   const [sendEmail, setSendEmail] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const isList = type === 'reminderList';
+  const hasItems = isList || (type === 'note' && checklist);
 
   const create = async () => {
     if (saving) return;
@@ -55,17 +57,48 @@ export default function NewPageScreen() {
       type,
       color,
       position,
-      body: isList ? undefined : body,
+      checklist: type === 'note' ? checklist : undefined,
+      body: hasItems ? undefined : body,
       notifyEnabled: isList ? undefined : notify,
       onceAt: !isList && notify ? onceAt : undefined,
       interval: isList ? interval : undefined,
       times: isList ? times : undefined,
-      items: isList ? items.map((i) => ({ text: i.text, note: i.note })) : undefined,
+      items: hasItems ? items.map((i) => ({ text: i.text, note: i.note })) : undefined,
       sendPush: isList || notify ? sendPush : undefined,
       sendEmail: isList || notify ? sendEmail : undefined,
     });
     router.replace(`/page/${id}`);
   };
+
+  const renderItemsEditor = () => (
+    <>
+      {items.map((item) => (
+        <View key={item.id} style={styles.itemBlock}>
+          <View style={styles.itemHeaderRow}>
+            <Text style={styles.checkbox}>☐</Text>
+            <TextInput
+              style={styles.itemInput}
+              placeholder="Item"
+              placeholderTextColor={UI.textMuted}
+              value={item.text}
+              onChangeText={(text) => setItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, text } : it)))}
+            />
+            <Pressable hitSlop={10} onPress={() => setItems((prev) => prev.filter((it) => it.id !== item.id))}>
+              <Text style={styles.remove}>✕</Text>
+            </Pressable>
+          </View>
+          <RichHtmlEditor
+            value={item.note}
+            onChange={(note) => setItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, note } : it)))}
+            placeholder="Note for this item…"
+          />
+        </View>
+      ))}
+      <Pressable onPress={() => setItems((prev) => [...prev, { id: newItemId(), text: '', note: '' }])}>
+        <Text style={styles.addLink}>＋ Add item</Text>
+      </Pressable>
+    </>
+  );
 
   return (
     <>
@@ -103,7 +136,16 @@ export default function NewPageScreen() {
 
           {!isList && (
             <>
-              <RichHtmlEditor value={body} onChange={setBody} placeholder="Write your note…" />
+              <View style={styles.segment}>
+                <Pressable style={[styles.segmentButton, !checklist && styles.segmentActive]} onPress={() => setChecklist(false)}>
+                  <Text style={[styles.segmentText, !checklist && styles.segmentTextActive]}>Text</Text>
+                </Pressable>
+                <Pressable style={[styles.segmentButton, checklist && styles.segmentActive]} onPress={() => setChecklist(true)}>
+                  <Text style={[styles.segmentText, checklist && styles.segmentTextActive]}>☑ Checklist</Text>
+                </Pressable>
+              </View>
+
+              {checklist ? renderItemsEditor() : <RichHtmlEditor value={body} onChange={setBody} placeholder="Write your note…" />}
 
               <View style={styles.section}>
                 <Toggle label="🔔 Notify me" value={notify} onChange={setNotify} />
@@ -148,31 +190,7 @@ export default function NewPageScreen() {
               </View>
 
               <Text style={styles.label}>Items</Text>
-              {items.map((item) => (
-                <View key={item.id} style={styles.itemBlock}>
-                  <View style={styles.itemHeaderRow}>
-                    <Text style={styles.checkbox}>☐</Text>
-                    <TextInput
-                      style={styles.itemInput}
-                      placeholder="Item"
-                      placeholderTextColor={UI.textMuted}
-                      value={item.text}
-                      onChangeText={(text) => setItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, text } : it)))}
-                    />
-                    <Pressable hitSlop={10} onPress={() => setItems((prev) => prev.filter((it) => it.id !== item.id))}>
-                      <Text style={styles.remove}>✕</Text>
-                    </Pressable>
-                  </View>
-                  <RichHtmlEditor
-                    value={item.note}
-                    onChange={(note) => setItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, note } : it)))}
-                    placeholder="Note for this item…"
-                  />
-                </View>
-              ))}
-              <Pressable onPress={() => setItems((prev) => [...prev, { id: newItemId(), text: '', note: '' }])}>
-                <Text style={styles.addLink}>＋ Add item</Text>
-              </Pressable>
+              {renderItemsEditor()}
             </>
           )}
 

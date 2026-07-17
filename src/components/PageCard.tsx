@@ -20,13 +20,18 @@ export function PageCard({
   page,
   onPress,
   onLongPress,
+  onEdit,
+  onDelete,
 }: {
   page: Page;
   onPress: () => void;
   onLongPress: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
-  const bodyPreview = page.type === 'note' ? htmlToPlain(page.body).split('\n').filter(Boolean).slice(0, 5) : [];
-  const items = page.type === 'reminderList' ? page.items.slice(0, 4) : [];
+  const showItems = page.type === 'reminderList' || (page.type === 'note' && page.checklist);
+  const bodyPreview = page.type === 'note' && !page.checklist ? htmlToPlain(page.body).split('\n').filter(Boolean).slice(0, 5) : [];
+  const items = showItems ? page.items.slice(0, 4) : [];
   return (
     <Pressable
       onPress={onPress}
@@ -49,9 +54,7 @@ export function PageCard({
           {item.text}
         </Text>
       ))}
-      {page.type === 'reminderList' && page.items.length > 4 && (
-        <Text style={styles.more}>+{page.items.length - 4} more</Text>
-      )}
+      {showItems && page.items.length > 4 && <Text style={styles.more}>+{page.items.length - 4} more</Text>}
 
       <Text style={styles.badge}>{badge(page)}</Text>
       {page.archived && <Text style={styles.archivedTag}>Archived</Text>}
@@ -60,6 +63,15 @@ export function PageCard({
           {page.tags.map((t) => `#${t}`).join(' ')}
         </Text>
       )}
+
+      <View style={styles.actions}>
+        <Pressable hitSlop={8} onPress={onEdit} style={styles.actionBtn}>
+          <Text style={styles.actionIcon}>✎</Text>
+        </Pressable>
+        <Pressable hitSlop={8} onPress={onDelete} style={styles.actionBtn}>
+          <Text style={styles.actionIcon}>🗑</Text>
+        </Pressable>
+      </View>
     </Pressable>
   );
 }
@@ -82,4 +94,7 @@ const styles = StyleSheet.create({
   badge: { fontSize: 12, color: UI.textMuted, marginTop: 8 },
   archivedTag: { fontSize: 11, color: UI.textMuted, marginTop: 4, fontStyle: 'italic' },
   tags: { fontSize: 11, color: UI.textMuted, marginTop: 4 },
+  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 14, marginTop: 8 },
+  actionBtn: { padding: 2 },
+  actionIcon: { fontSize: 15, color: UI.textMuted },
 });

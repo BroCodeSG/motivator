@@ -14,7 +14,7 @@ import {
 import { FAB } from '@/components/FAB';
 import { PageCard } from '@/components/PageCard';
 import { Toggle } from '@/components/Toggle';
-import { changePin, getUserEmail, setUserEmail } from '@/lib/auth';
+import { changePin, getRetentionMonths, getUserEmail, setRetentionMonths, setUserEmail } from '@/lib/auth';
 import { confirmAction } from '@/lib/confirm';
 import { cancelAllNotifications, notificationsAvailable, reconcileAll, scheduledCount } from '@/lib/notifications';
 import { deletePage } from '@/lib/pages';
@@ -35,6 +35,7 @@ export default function HomeScreen() {
   const [pinDraft, setPinDraft] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
   const [search, setSearch] = useState('');
+  const [retentionDraft, setRetentionDraft] = useState('3');
 
   const allTags = [...new Set(pages.flatMap((p) => p.tags))].sort();
   const q = search.trim().toLowerCase();
@@ -64,13 +65,27 @@ export default function HomeScreen() {
     setStatusMsg('');
     setPinDraft('');
     setCount(await scheduledCount());
-    if (userId) setEmailDraft(await getUserEmail(userId));
+    if (userId) {
+      setEmailDraft(await getUserEmail(userId));
+      setRetentionDraft(String(await getRetentionMonths(userId)));
+    }
   };
 
   const saveEmail = async () => {
     if (!userId) return;
     await setUserEmail(userId, emailDraft.trim());
     setStatusMsg('Email saved.');
+  };
+
+  const saveRetention = async () => {
+    if (!userId) return;
+    const n = parseInt(retentionDraft, 10);
+    if (!(n >= 1)) {
+      setStatusMsg('Enter a number of months (1 or more).');
+      return;
+    }
+    await setRetentionMonths(userId, n);
+    setStatusMsg(`Archived pages delete after ${n} month(s).`);
   };
 
   const savePin = async () => {
@@ -193,6 +208,8 @@ export default function HomeScreen() {
               page={item}
               onPress={() => router.push(`/page/${item.id}`)}
               onLongPress={() => confirmDelete(item.id, item.title)}
+              onEdit={() => router.push(`/page/${item.id}?edit=1`)}
+              onDelete={() => confirmDelete(item.id, item.title)}
             />
           )}
         />
@@ -236,6 +253,16 @@ export default function HomeScreen() {
 
               <View style={styles.divider} />
               <Toggle label="Show archived pages" value={showArchived} onChange={setShowArchived} />
+              <Text style={styles.label}>Delete archived after (months)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="number-pad"
+                value={retentionDraft}
+                onChangeText={setRetentionDraft}
+              />
+              <Pressable style={styles.button} onPress={saveRetention}>
+                <Text style={styles.buttonText}>Save</Text>
+              </Pressable>
 
               <View style={styles.divider} />
               <Text style={styles.muted}>
