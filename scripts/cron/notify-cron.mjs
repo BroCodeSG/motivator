@@ -68,21 +68,31 @@ function recentOccurrence(interval, t, now) {
   return new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + offsetFromMonday, t.hour, t.minute, 0, 0);
 }
 
-const plainText = (md) =>
-  (md ?? '').replace(/\*\*/g, '').replace(/==/g, '').replace(/~~/g, '').replace(/\*/g, '').replace(/^- /gm, '• ');
+const esc = (s) => (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const htmlToText = (html) =>
+  (html ?? '')
+    .replace(/<li>/gi, '• ')
+    .replace(/<\/(div|p|h1|h2|li|ul|ol)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
-// Returns { key, body } if the page is due for an email now, else null.
+// Returns { key, html, text } if the page is due for an email now, else null.
 function dueEmail(page, now) {
   const unchecked = (page.items ?? []).filter((i) => !i.checked);
-  const bodyFrom = (items) =>
-    items.map((i) => (i.note ? `• ${i.text} (${i.note})` : `• ${i.text}`)).join('\n') || page.title;
 
-  // Note with "Notify me" -> one-off reminder emailing the note body.
+  // Note with "Notify me" -> one-off reminder emailing the note body (styled).
   if (page.type === 'note') {
     if (!page.notifyEnabled || !page.onceAt) return null;
     const at = new Date(page.onceAt);
     if (Number.isNaN(at.getTime()) || at.getTime() > now.getTime()) return null;
-    return { key: `once:${page.onceAt}`, body: plainText(page.body) || page.title };
+    const html = page.body || `<p>${esc(page.title)}</p>`;
+    return { key: `once:${page.onceAt}`, html, text: htmlToText(page.body) || page.title };
   }
 
   if (page.type === 'reminderList' && page.reminder) {
@@ -94,14 +104,19 @@ function dueEmail(page, now) {
       if (ms >= 0 && ms <= LOOKBACK_MS && (!best || occ.getTime() > best.getTime())) best = occ;
     }
     if (!best) return null;
-    return { key: `${page.reminder.interval}:${best.toISOString()}`, body: bodyFrom(unchecked) };
+    const html =
+      '<ul>' +
+      unchecked.map((i) => `<li>${esc(i.text)}${i.note ? ` — ${htmlToText(i.note)}` : ''}</li>`).join('') +
+      '</ul>';
+    const text = unchecked.map((i) => `• ${i.text}${i.note ? ` (${htmlToText(i.note)})` : ''}`).join('\n') || page.title;
+    return { key: `${page.reminder.interval}:${best.toISOString()}`, html, text };
   }
 
   return null;
 }
 
 let transporter = null;
-async function send(to, subject, text) {
+async function send(to, subject, html, text) {
   if (DRY) {
     console.log(`[dry-run] would email ${to}: "${subject}"\n${text}\n`);
     return;
@@ -117,7 +132,7 @@ async function send(to, subject, text) {
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
     });
   }
-  await transporter.sendMail({ from: `TBKA <${process.env.SMTP_USER}>`, to, subject, text });
+  await transporter.sendMail({ from: `TBKA <${process.env.SMTP_USER}>`, to, subject, html, text });
   console.log(`Emailed ${to}: "${subject}"`);
 }
 
@@ -140,7 +155,7 @@ for (const userRef of users) {
       console.log(`Page "${page.title}" is due but ${userRef.id} has no email set — skipping.`);
       continue;
     }
-    await send(email, page.title || 'Reminder', due.body);
+    await send(email, page.title || 'Reminder', due.html, due.text);
     sent++;
     if (!DRY) await doc.ref.update({ lastEmailKey: due.key });
   }

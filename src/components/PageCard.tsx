@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { stripMarkdown } from '@/components/RichText';
+import { htmlToPlain } from '@/lib/richtext';
 import { pageColor, UI } from '@/theme';
 import type { Page } from '@/types';
 
@@ -25,7 +25,7 @@ export function PageCard({
   onPress: () => void;
   onLongPress: () => void;
 }) {
-  const bodyPreview = page.type === 'note' ? stripMarkdown(page.body).split('\n').filter(Boolean).slice(0, 5) : [];
+  const bodyPreview = page.type === 'note' ? htmlToPlain(page.body).split('\n').filter(Boolean).slice(0, 5) : [];
   const items = page.type === 'reminderList' ? page.items.slice(0, 4) : [];
   return (
     <Pressable

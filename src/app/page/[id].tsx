@@ -5,7 +5,8 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 
 import { ColorDots } from '@/components/ColorDots';
 import { OnceField } from '@/components/OnceField';
-import { RichText, RichTextEditor } from '@/components/RichText';
+import { RichHtml } from '@/components/RichHtml';
+import { RichHtmlEditor } from '@/components/RichHtmlEditor';
 import { TagEditor } from '@/components/TagEditor';
 import { TimeRow } from '@/components/TimeRow';
 import { Toggle } from '@/components/Toggle';
@@ -80,7 +81,14 @@ export default function PageDetailScreen() {
             </Pressable>
           ),
           headerRight: () => (
-            <Pressable onPress={() => setEditing((e) => !e)} hitSlop={10}>
+            <Pressable
+              onPress={() => {
+                // Flush any focused rich-text editor (its onCommit fires on blur) before leaving edit mode.
+                if (editing) (globalThis as any).document?.activeElement?.blur?.();
+                setEditing((e) => !e);
+              }}
+              hitSlop={10}
+            >
               <Text style={styles.headerButton}>{editing ? 'Done' : 'Edit'}</Text>
             </Pressable>
           ),
@@ -117,7 +125,7 @@ function ReadView({ page }: { page: Page }) {
 
       {page.type === 'note' ? (
         page.body !== '' ? (
-          <RichText value={page.body} />
+          <RichHtml value={page.body} />
         ) : (
           <Text style={styles.hint}>Empty note. Tap Edit to write something.</Text>
         )
@@ -134,7 +142,7 @@ function ReadView({ page }: { page: Page }) {
               </View>
               {item.note !== '' && (
                 <View style={styles.itemNoteBox}>
-                  <RichText value={item.note} style={styles.itemNoteText} />
+                  <RichHtml value={item.note} style={styles.itemNoteText} />
                 </View>
               )}
             </View>
@@ -214,7 +222,7 @@ function EditView({ page, allTags }: { page: Page; allTags: string[] }) {
 
       {page.type === 'note' && (
         <>
-          <RichTextEditor value={page.body} onCommit={(t) => t !== page.body && setBody(page.id, t)} placeholder="Write your note…" />
+          <RichHtmlEditor value={page.body} onCommit={(t) => t !== page.body && setBody(page.id, t)} placeholder="Write your note…" />
           <View style={styles.section}>
             <Toggle label="🔔 Notify me" value={page.notifyEnabled} onChange={(v) => setNotifyEnabled(page.id, v)} />
             {page.notifyEnabled && (
@@ -271,7 +279,7 @@ function EditView({ page, allTags }: { page: Page; allTags: string[] }) {
                     <Text style={styles.remove}>✕</Text>
                   </Pressable>
                 </View>
-                <RichTextEditor
+                <RichHtmlEditor
                   value={item.note}
                   onCommit={(note) => note !== item.note && setItemNote(page, item.id, note)}
                   placeholder="Note for this item…"

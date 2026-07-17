@@ -11,6 +11,7 @@ import {
 
 import { db } from '@/firebase';
 import { currentPeriodKey } from '@/lib/periods';
+import { ensureHtml } from '@/lib/richtext';
 import type { IntervalType, Item, Page, PageType, ReminderConfig, ReminderTime } from '@/types';
 import { newItemId } from '@/types';
 
@@ -34,7 +35,7 @@ function normalizeItems(raw: any): Item[] {
     id: i.id ?? newItemId(),
     text: i.text ?? '',
     checked: !!i.checked,
-    note: i.note ?? '',
+    note: ensureHtml(i.note ?? ''),
   }));
 }
 
@@ -77,7 +78,7 @@ function docToPage(id: string, data: any): Page {
     position: data.position ?? 0,
     tags: Array.isArray(data.tags) ? data.tags : [],
     archived: !!data.archived,
-    body,
+    body: ensureHtml(body),
     notifyEnabled,
     onceAt,
     items,

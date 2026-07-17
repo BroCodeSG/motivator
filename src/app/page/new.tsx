@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 
 import { ColorDots } from '@/components/ColorDots';
 import { OnceField, defaultOnceDate, toLocalIso } from '@/components/OnceField';
-import { RichTextEditor } from '@/components/RichText';
+import { RichHtmlEditor } from '@/components/RichHtmlEditor';
 import { TimeRow } from '@/components/TimeRow';
 import { Toggle } from '@/components/Toggle';
 import { createPage } from '@/lib/pages';
@@ -103,7 +103,7 @@ export default function NewPageScreen() {
 
           {!isList && (
             <>
-              <RichTextEditor value={body} onChange={setBody} placeholder="Write your note…" />
+              <RichHtmlEditor value={body} onChange={setBody} placeholder="Write your note…" />
 
               <View style={styles.section}>
                 <Toggle label="🔔 Notify me" value={notify} onChange={setNotify} />
@@ -163,7 +163,7 @@ export default function NewPageScreen() {
                       <Text style={styles.remove}>✕</Text>
                     </Pressable>
                   </View>
-                  <RichTextEditor
+                  <RichHtmlEditor
                     value={item.note}
                     onChange={(note) => setItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, note } : it)))}
                     placeholder="Note for this item…"

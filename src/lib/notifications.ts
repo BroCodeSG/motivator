@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 import { applyReset, setArchived } from '@/lib/pages';
 import { currentPeriodKey, nextPeriodOccurrences } from '@/lib/periods';
+import { htmlToPlain } from '@/lib/richtext';
 import type { Page, ReminderTime } from '@/types';
 
 // expo-notifications crashes on import inside Expo Go on Android (removed
@@ -108,10 +109,6 @@ export function reconcileAll(pages: Page[]): Promise<void> {
   return chain;
 }
 
-function plainText(md: string): string {
-  return md.replace(/\*\*/g, '').replace(/==/g, '').replace(/~~/g, '').replace(/\*/g, '').replace(/^- /gm, '• ');
-}
-
 async function doReconcile(pages: Page[]): Promise<void> {
   const Notifications = getNotifications();
   const now = new Date();
@@ -143,7 +140,7 @@ async function doReconcile(pages: Page[]): Promise<void> {
       const at = new Date(page.onceAt);
       if (Number.isNaN(at.getTime()) || at.getTime() <= now.getTime()) continue;
       await Notifications.scheduleNotificationAsync({
-        content: content(page, plainText(page.body) || page.title),
+        content: content(page, htmlToPlain(page.body) || page.title),
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at },
       });
       continue;
