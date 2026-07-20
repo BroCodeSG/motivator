@@ -45,9 +45,13 @@ Reminders need `yyyy-mm-dd hh:mm` (24h). **Resolve natural language against toda
 
 Body text supports light markdown that renders formatted in the app: `**bold**`, `*italic*`, `==highlight==`, `~~strike~~`, `# heading`, `- bullet`, `[label](url)`.
 
-## After creating
+## After running
 
-Tell Stefan concisely what you created, **which format** (note / checklist / reminder / recurring reminder), and key details. It's now on his phone and web. Reminders (push) fire from the installed Android app; email reminders need the GitHub Actions secrets set. Notes/lists themselves work everywhere immediately.
+The script prints one of two things — relay it accordingly:
+- **"Created …"** — it wrote directly (network available, e.g. Claude Code). Tell Stefan what you created, its format, and that it's on his phone and web.
+- **"…tap this link…\n<url>"** — the environment had no network (e.g. claude.ai's sandbox), so it produced a **tap-to-add link** instead. Give Stefan that link and tell him to open it (signed in to TBKA) — his browser then creates the page. Present the URL plainly so it's clickable.
+
+Reminders (push) fire from the installed Android app; email reminders need the GitHub Actions secrets set. Notes/lists themselves work everywhere immediately.
 
 ## Examples
 

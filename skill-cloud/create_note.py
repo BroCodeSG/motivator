@@ -12,6 +12,7 @@ Examples:
       --items "Vitamins;Water" --times "07:00"
 """
 import argparse
+import base64
 import json
 import re
 import sys
@@ -19,6 +20,7 @@ import time
 import urllib.request
 from datetime import datetime, timezone
 
+WEB_APP = "https://thebetterreminderapp.web.app"
 PROJECT = "thebetterreminderapp"
 API_KEY = "AIzaSyBDXg97CDEoBi3_1OO0U_hWAYaK7q6LD_U"  # public web key; DB rules are open by design
 USER_ID = "0006015226084"  # Stefan's TBKA account
@@ -46,13 +48,14 @@ def parse_once(spec):
     return f"{m.group(1)}T{int(m.group(2)):02d}:{m.group(3)}"
 
 
-def parse_times(interval, spec):
+def parse_times_plain(interval, spec):
+    """Parse a times spec into plain dicts {hour,minute,weekday?,day?}."""
     out = []
     for part in spec.split(","):
         part = part.strip()
         if interval == "daily":
             h, _, mm = part.partition(":")
-            out.append(mp({"hour": i(h), "minute": i(mm or 0)}))
+            out.append({"hour": int(h), "minute": int(mm or 0)})
         else:
             prefix, _, clock = part.partition("@")
             h, _, mm = clock.partition(":")
@@ -60,10 +63,19 @@ def parse_times(interval, spec):
                 wd = WEEKDAYS.get(prefix[:3].lower())
                 if not wd:
                     sys.exit(f'Unknown weekday "{prefix}"')
-                out.append(mp({"weekday": i(wd), "hour": i(h), "minute": i(mm or 0)}))
+                out.append({"weekday": wd, "hour": int(h), "minute": int(mm or 0)})
             else:  # monthly
-                out.append(mp({"day": i(int(prefix)), "hour": i(h), "minute": i(mm or 0)}))
+                out.append({"day": int(prefix), "hour": int(h), "minute": int(mm or 0)})
     return out
+
+
+def _time_to_fs(t):
+    f = {"hour": i(t["hour"]), "minute": i(t["minute"])}
+    if "weekday" in t:
+        f["weekday"] = i(t["weekday"])
+    if "day" in t:
+        f["day"] = i(t["day"])
+    return mp(f)
 
 
 def main():
@@ -87,20 +99,28 @@ def main():
     notify = (a.type == "note") and (a.notify or bool(a.at))
     has_items = is_list or checklist
     color = a.color if a.color in COLORS else "yellow"
+    once_at = parse_once(a.at) if (notify and a.at) else None
+
+    # Plain, portable spec (also used to build the tap-to-add link).
+    spec = {
+        "title": a.title,
+        "type": a.type,
+        "checklist": checklist,
+        "body": "" if has_items else a.body,
+        "items": [x.strip() for x in a.items.split(";") if x.strip()] if has_items else [],
+        "notify": notify,
+        "onceAt": once_at,
+        "interval": a.interval,
+        "times": parse_times_plain(a.interval, a.times) if (is_list and a.times) else [],
+        "color": color,
+    }
+    kind = "reminder list" if is_list else ("reminder" if notify else ("checklist note" if checklist else "note"))
+
     now = datetime.now(timezone.utc).isoformat()
-
-    items = []
-    if has_items and a.items:
-        for t in [x.strip() for x in a.items.split(";") if x.strip()]:
-            items.append(mp({"id": s(new_id()), "text": s(t), "checked": b(False), "note": s("")}))
-
-    reminder = nul()
+    reminder = mp({"interval": s(a.interval), "times": arr([_time_to_fs(t) for t in spec["times"]])}) if is_list else nul()
     last_reset = ""
     if is_list:
-        times = parse_times(a.interval, a.times) if a.times else []
-        reminder = mp({"interval": s(a.interval), "times": arr(times)})
         last_reset = datetime.now().strftime("%Y-%m-%d") if a.interval == "daily" else datetime.now().strftime("%Y-%m")
-
     fields = {
         "title": s(a.title),
         "type": s(a.type),
@@ -109,11 +129,11 @@ def main():
         "tags": arr([]),
         "archived": b(False),
         "archivedAt": nul(),
-        "body": s("" if has_items else a.body),
+        "body": s(spec["body"]),
         "checklist": b(checklist),
         "notifyEnabled": b(notify),
-        "onceAt": s(parse_once(a.at)) if (notify and a.at) else nul(),
-        "items": arr(items),
+        "onceAt": s(once_at) if once_at else nul(),
+        "items": arr([mp({"id": s(new_id()), "text": s(t), "checked": b(False), "note": s("")}) for t in spec["items"]]),
         "reminder": reminder,
         "lastResetPeriodKey": s(last_reset),
         "sendPush": b(True),
@@ -121,7 +141,6 @@ def main():
         "createdAt": {"timestampValue": now},
         "updatedAt": {"timestampValue": now},
     }
-
     url = (
         f"https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(default)"
         f"/documents/users/{uid}/pages?key={API_KEY}"
@@ -132,12 +151,15 @@ def main():
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
             r.read()
-    except Exception as e:  # noqa: BLE001
-        detail = getattr(e, "read", lambda: b"")()
-        sys.exit(f"Failed to create page: {e}\n{detail.decode(errors='ignore') if detail else ''}")
-
-    kind = "reminder list" if is_list else ("reminder" if notify else ("checklist note" if checklist else "note"))
-    print(f'Created {kind} "{a.title}" on TBKA (account {uid}).')
+        print(f'Created {kind} "{a.title}" on TBKA (account {uid}). It is on the phone and web now.')
+        return
+    except Exception:  # noqa: BLE001 — no network here (e.g. claude.ai sandbox): fall back to a link.
+        token = base64.urlsafe_b64encode(json.dumps(spec).encode()).decode()
+        link = f"{WEB_APP}/?add={token}"
+        print(
+            f"I can't reach the server from here, so tap this link on your phone or browser "
+            f"(you must be signed in to TBKA) and it will add the {kind} \"{a.title}\":\n{link}"
+        )
 
 
 if __name__ == "__main__":
