@@ -168,7 +168,7 @@ function printPage(doc) {
   if (p.archived) notifying.push('ARCHIVED');
   const tags = (p.tags ?? []).length ? ' ' + p.tags.map((t) => `#${t}`).join(' ') : '';
   console.log(`${p.title || 'Untitled'} ${head}${notifying.length ? ` {${notifying.join(',')}}` : ''}${tags} (${p.color}, id ${doc.id})`);
-  if (p.type === 'note') {
+  if (p.type === 'note' && !p.checklist) {
     if (p.body) console.log(`  ${p.body.replace(/\n/g, '\n  ')}`);
   } else {
     (p.items ?? []).forEach((i, n) => {
@@ -238,8 +238,10 @@ switch (cmd) {
       onceAt = notifyEnabled ? parseOnceAt(flags.at) : null;
       color = COLORS.includes(flags.color) ? flags.color : 'yellow';
     }
-    body = type === 'note' ? flags.body ?? '' : '';
-    itemsSpec = type === 'reminderList' && flags.items ? flags.items.split(';').map((s) => s.trim()).filter(Boolean) : [];
+    const checklist = type === 'note' && onFlag(flags.checklist);
+    const hasItems = type === 'reminderList' || checklist;
+    body = type === 'note' && !checklist ? flags.body ?? '' : '';
+    itemsSpec = hasItems && flags.items ? flags.items.split(';').map((s) => s.trim()).filter(Boolean) : [];
     const all = await col.get();
     const position = all.docs.reduce((m, d) => Math.max(m, d.data().position ?? 0), 0) + 1;
     const notifies = type === 'reminderList' || notifyEnabled;
@@ -251,7 +253,9 @@ switch (cmd) {
       position,
       tags: [],
       archived: false,
+      archivedAt: null,
       body,
+      checklist,
       notifyEnabled: type === 'note' ? notifyEnabled : false,
       onceAt: type === 'note' ? onceAt : null,
       items: itemsSpec.map((text) => ({ id: newId(), text, checked: false, note: '' })),
@@ -262,7 +266,7 @@ switch (cmd) {
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
-    console.log(`Created ${type}${notifyEnabled ? ' (reminder)' : ''} "${title}" (id ${id})`);
+    console.log(`Created ${checklist ? 'checklist ' : ''}${type}${notifyEnabled ? ' (reminder)' : ''} "${title}" (id ${id})`);
     if (type === 'reminderList') console.log('Set times with: set-times');
     break;
   }
