@@ -12,13 +12,13 @@ Examples:
       --items "Vitamins;Water" --times "07:00"
 """
 import argparse
-import base64
 import json
 import re
 import sys
 import time
 import urllib.request
 from datetime import datetime, timezone
+from urllib.parse import urlencode
 
 WEB_APP = "https://thebetterreminderapp.web.app"
 PROJECT = "thebetterreminderapp"
@@ -154,11 +154,24 @@ def main():
         print(f'Created {kind} "{a.title}" on TBKA (account {uid}). It is on the phone and web now.')
         return
     except Exception:  # noqa: BLE001 — no network here (e.g. claude.ai sandbox): fall back to a link.
-        token = base64.urlsafe_b64encode(json.dumps(spec).encode()).decode()
-        link = f"{WEB_APP}/?add={token}"
+        q = {"new": "1", "title": a.title, "type": a.type, "color": color}
+        if checklist:
+            q["checklist"] = "1"
+        if spec["body"]:
+            q["body"] = spec["body"]
+        if spec["items"]:
+            q["items"] = ";".join(spec["items"])
+        if notify:
+            q["notify"] = "1"
+        if once_at:
+            q["at"] = once_at
+        if is_list:
+            q["interval"] = a.interval
+            if a.times:
+                q["times"] = a.times
+        link = f"{WEB_APP}/?{urlencode(q)}"
         print(
-            f"I can't reach the server from here, so tap this link on your phone or browser "
-            f"(you must be signed in to TBKA) and it will add the {kind} \"{a.title}\":\n{link}"
+            f'TAP-TO-ADD LINK (open it signed in to TBKA to create the {kind} "{a.title}"):\n{link}'
         )
 
 

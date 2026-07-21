@@ -21,6 +21,71 @@ import { createPage, deletePage } from '@/lib/pages';
 import { usePages } from '@/lib/pages-context';
 import { useSession } from '@/lib/session-context';
 import { UI } from '@/theme';
+import type { IntervalType, ReminderTime } from '@/types';
+
+const WEEKDAYS: Record<string, number> = { sun: 1, mon: 2, tue: 3, wed: 4, thu: 5, fri: 6, sat: 7 };
+
+interface AddSpec {
+  title?: string;
+  type?: string;
+  checklist?: boolean;
+  body?: string;
+  items?: string[];
+  notify?: boolean;
+  onceAt?: string | null;
+  interval?: string;
+  times?: ReminderTime[];
+  color?: string;
+}
+
+function parseTimesSpec(interval: string, spec: string): ReminderTime[] {
+  return spec
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((part) => {
+      if (interval === 'daily') {
+        const [h, m] = part.split(':').map(Number);
+        return { hour: h, minute: m || 0 };
+      }
+      const [prefix, clock] = part.split('@');
+      const [h, m] = (clock || '').split(':').map(Number);
+      if (interval === 'weekly') return { weekday: WEEKDAYS[prefix.slice(0, 3).toLowerCase()] || 2, hour: h, minute: m || 0 };
+      return { day: Number(prefix) || 1, hour: h, minute: m || 0 };
+    });
+}
+
+// Turn the URL query into an AddSpec, or null if it's not an add-link.
+function parseAddParams(p: Record<string, any>): AddSpec | null {
+  if (p.add) {
+    try {
+      const b64 = String(p.add).replace(/-/g, '+').replace(/_/g, '/');
+      const padded = b64 + '==='.slice((b64.length + 3) % 4);
+      const bin = (globalThis as any).atob(padded);
+      const bytes = Uint8Array.from(bin, (c: string) => c.charCodeAt(0));
+      return JSON.parse(new TextDecoder().decode(bytes));
+    } catch {
+      return null;
+    }
+  }
+  if (p.new === '1' || (p.title && p.new !== undefined)) {
+    const interval = ['daily', 'weekly', 'monthly'].includes(p.interval) ? p.interval : 'daily';
+    const at = p.at ? String(p.at).replace(' ', 'T') : null;
+    return {
+      title: p.title ?? '',
+      type: p.type === 'reminderList' ? 'reminderList' : 'note',
+      checklist: p.checklist === '1' || p.checklist === 'true',
+      body: p.body ?? '',
+      items: p.items ? String(p.items).split(';').map((x) => x.trim()).filter(Boolean) : [],
+      notify: p.notify === '1' || p.notify === 'true' || !!p.at,
+      onceAt: at,
+      interval,
+      times: p.times ? parseTimesSpec(interval, String(p.times)) : [],
+      color: p.color,
+    };
+  }
+  return null;
+}
 
 export default function HomeScreen() {
   const { pages, ready } = usePages();
@@ -36,33 +101,32 @@ export default function HomeScreen() {
   const [statusMsg, setStatusMsg] = useState('');
   const [search, setSearch] = useState('');
   const [retentionDraft, setRetentionDraft] = useState('3');
-  const { add } = useLocalSearchParams<{ add?: string }>();
+  const params = useLocalSearchParams<Record<string, string>>();
   const addApplied = useRef(false);
 
-  // "Tap to add" deep link (?add=<base64url spec>) — created by the tbka-note
-  // skill when it can't reach the network itself (e.g. from claude.ai). The
-  // logged-in browser does the actual write here.
+  // "Tap to add" deep link — lets a networkless assistant (e.g. claude.ai) create
+  // a page by handing the user a URL; the logged-in browser does the write.
+  // Two forms:
+  //   ?add=<base64url json spec>                        (built by create_note.py)
+  //   ?new=1&title=..&type=..&items=a;b&at=..&...        (built by hand — no script)
   useEffect(() => {
-    if (!add || addApplied.current || !userId || !ready) return;
+    if (addApplied.current || !userId || !ready) return;
+    const spec = parseAddParams(params);
+    if (!spec) return;
     addApplied.current = true;
     try {
-      const b64 = add.replace(/-/g, '+').replace(/_/g, '/');
-      const padded = b64 + '==='.slice((b64.length + 3) % 4);
-      const bin = (globalThis as any).atob(padded);
-      const bytes = Uint8Array.from(bin, (c: string) => c.charCodeAt(0));
-      const spec = JSON.parse(new TextDecoder().decode(bytes));
       const position = pages.reduce((m, p) => Math.max(m, p.position), 0) + 1;
       const isList = spec.type === 'reminderList';
       createPage({
         title: spec.title ?? '',
-        type: spec.type === 'reminderList' ? 'reminderList' : 'note',
+        type: isList ? 'reminderList' : 'note',
         color: spec.color ?? 'yellow',
         position,
         checklist: !isList ? !!spec.checklist : undefined,
         body: !isList && !spec.checklist ? spec.body ?? '' : undefined,
         notifyEnabled: !isList ? !!spec.notify : undefined,
         onceAt: !isList && spec.notify ? spec.onceAt ?? null : undefined,
-        interval: isList ? spec.interval ?? 'daily' : undefined,
+        interval: isList ? ((spec.interval as IntervalType) ?? 'daily') : undefined,
         times: isList ? spec.times ?? [] : undefined,
         items: isList || spec.checklist ? (spec.items ?? []).map((t: string) => ({ text: t })) : undefined,
       }).catch(() => {});
@@ -70,7 +134,7 @@ export default function HomeScreen() {
       // ignore a malformed link
     }
     router.replace('/');
-  }, [add, userId, ready, pages, router]);
+  }, [params, userId, ready, pages, router]);
 
   const allTags = [...new Set(pages.flatMap((p) => p.tags))].sort();
   const q = search.trim().toLowerCase();
