@@ -43,7 +43,7 @@ function NotificationSync() {
   }, []);
 
   useEffect(() => {
-    return addResponseListener((pageId) => router.push(`/page/${pageId}`));
+    return addResponseListener((pageId) => router.push(`/?open=${pageId}`));
   }, [router]);
 
   return null;
@@ -68,10 +68,6 @@ function Root() {
       >
         <Stack.Screen name="index" options={{ title: 'TBKA' }} />
         <Stack.Screen name="page/new" options={{ title: 'New page', presentation: 'modal' }} />
-        <Stack.Screen
-          name="page/[id]"
-          options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }}
-        />
       </Stack>
     </PagesProvider>
   );

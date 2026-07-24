@@ -3,16 +3,19 @@ import { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
 import { FAB } from '@/components/FAB';
 import { PageCard } from '@/components/PageCard';
+import { PageDetailCard } from '@/components/PageDetailCard';
 import { Toggle } from '@/components/Toggle';
 import { changePin, getRetentionMonths, getUserEmail, setRetentionMonths, setUserEmail } from '@/lib/auth';
 import { confirmAction } from '@/lib/confirm';
@@ -102,7 +105,22 @@ export default function HomeScreen() {
   const [search, setSearch] = useState('');
   const [retentionDraft, setRetentionDraft] = useState('3');
   const params = useLocalSearchParams<Record<string, string>>();
+  const { width } = useWindowDimensions();
+  const numColumns = width >= 720 ? 3 : 2;
   const addApplied = useRef(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [openEditing, setOpenEditing] = useState(false);
+  const webBlur: any = Platform.OS === 'web' ? { backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' } : {};
+
+  // Open a page from a deep link (?open=<id>, e.g. a notification tap).
+  useEffect(() => {
+    if (params.open) {
+      setOpenId(String(params.open));
+      setOpenEditing(false);
+      router.replace('/');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.open]);
 
   // "Tap to add" deep link — lets a networkless assistant (e.g. claude.ai) create
   // a page by handing the user a URL; the logged-in browser does the write.
@@ -299,21 +317,35 @@ export default function HomeScreen() {
       ) : (
         <FlatList
           data={visiblePages}
-          numColumns={2}
+          numColumns={numColumns}
+          key={`cols-${numColumns}`}
           keyExtractor={(p) => p.id}
           contentContainerStyle={styles.grid}
           renderItem={({ item }) => (
             <PageCard
               page={item}
-              onPress={() => router.push(`/page/${item.id}`)}
+              onPress={() => {
+                setOpenEditing(false);
+                setOpenId(item.id);
+              }}
               onLongPress={() => confirmDelete(item.id, item.title)}
-              onEdit={() => router.push(`/page/${item.id}?edit=1`)}
+              onEdit={() => {
+                setOpenEditing(true);
+                setOpenId(item.id);
+              }}
               onDelete={() => confirmDelete(item.id, item.title)}
             />
           )}
         />
       )}
       <FAB onPress={() => router.push('/page/new')} />
+
+      {openId && (
+        <View style={[styles.overlay, webBlur]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpenId(null)} />
+          <PageDetailCard id={openId} initialEditing={openEditing} onClose={() => setOpenId(null)} />
+        </View>
+      )}
 
       <Modal visible={settingsVisible} transparent animationType="fade" onRequestClose={() => setSettingsVisible(false)}>
         <Pressable style={styles.backdrop} onPress={() => setSettingsVisible(false)}>
@@ -390,6 +422,18 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: UI.background },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    zIndex: 50,
+  },
   grid: { padding: 6, paddingBottom: 100 },
   search: {
     margin: 12,

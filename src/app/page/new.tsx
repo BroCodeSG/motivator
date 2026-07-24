@@ -99,8 +99,11 @@ export default function NewPageScreen() {
           />
         </View>
       ))}
-      <Pressable onPress={() => setItems((prev) => [...prev, { id: newItemId(), text: '', note: '' }])}>
-        <Text style={styles.addLink}>＋ Add item</Text>
+      <Pressable
+        style={styles.addItemButton}
+        onPress={() => setItems((prev) => [...prev, { id: newItemId(), text: '', note: '' }])}
+      >
+        <Text style={styles.addItemButtonText}>＋ Add item</Text>
       </Pressable>
     </>
   );
@@ -242,10 +245,19 @@ const styles = StyleSheet.create({
   segmentTextActive: { color: UI.accent },
   itemBlock: { borderWidth: 1, borderColor: UI.border, borderRadius: 10, padding: 10, gap: 8, marginBottom: 4 },
   itemHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  checkbox: { fontSize: 18, color: UI.text },
-  itemInput: { flex: 1, fontSize: 16, color: UI.text, paddingVertical: 2 },
+  checkbox: { fontSize: 22, color: UI.text },
+  itemInput: { flex: 1, fontSize: 18, color: UI.text, fontWeight: '500', paddingVertical: 2 },
   remove: { color: UI.textMuted, fontSize: 14, paddingHorizontal: 4 },
   addLink: { color: UI.accent, fontWeight: '600', paddingVertical: 8 },
+  addItemButton: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: UI.accent,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  addItemButtonText: { color: UI.accent, fontWeight: '700', fontSize: 15 },
   hint: { fontSize: 12, color: UI.textMuted },
   createButton: { marginTop: 24, backgroundColor: UI.accent, borderRadius: 10, padding: 14, alignItems: 'center' },
   createButtonDisabled: { opacity: 0.5 },

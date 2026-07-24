@@ -1,5 +1,4 @@
 import { format } from 'date-fns';
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -10,7 +9,6 @@ import { RichHtmlEditor } from '@/components/RichHtmlEditor';
 import { TagEditor } from '@/components/TagEditor';
 import { TimeRow } from '@/components/TimeRow';
 import { Toggle } from '@/components/Toggle';
-import { confirmAction } from '@/lib/confirm';
 import {
   addItem,
   removeItem,
@@ -52,53 +50,65 @@ function summary(page: Page): string {
   return `🔁 ${label}${r?.times.length ? ` · ${r.times.length} time(s)` : ' · no times'}`;
 }
 
-export default function PageDetailScreen() {
-  const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
+// The Keep-style card shown when a tile is opened. The blurred backdrop is
+// supplied by whoever renders this (so the home grid stays visible behind it).
+export function PageDetailCard({
+  id,
+  initialEditing,
+  onClose,
+}: {
+  id: string;
+  initialEditing?: boolean;
+  onClose: () => void;
+}) {
   const page = usePage(id);
   const { pages } = usePages();
-  const router = useRouter();
-  const [editing, setEditing] = useState(edit === '1');
+  const [editing, setEditing] = useState(!!initialEditing);
   const allTags = [...new Set(pages.flatMap((p) => p.tags))].sort();
 
-  const close = () => {
-    (globalThis as any).document?.activeElement?.blur?.();
-    router.back();
-  };
   const toggleEdit = () => {
     if (editing) (globalThis as any).document?.activeElement?.blur?.();
     setEditing((e) => !e);
   };
 
-  const webBlur: any =
-    Platform.OS === 'web' ? { backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' } : {};
-
   return (
-    <View style={[styles.backdrop, webBlur]}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={close} />
-      <KeyboardAvoidingView style={styles.modalWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={[styles.modalCard, { backgroundColor: page ? pageColor(page.color) : UI.surface }]}>
-          <View style={styles.topBar}>
-            <Pressable onPress={close} hitSlop={10}>
-              <Text style={styles.headerButton}>✕</Text>
+    <KeyboardAvoidingView style={styles.modalWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={[styles.modalCard, { backgroundColor: page ? pageColor(page.color) : UI.surface }]}>
+        {!page ? (
+          <View style={styles.missing}>
+            <Text style={{ color: UI.textMuted }}>This page no longer exists.</Text>
+            <Pressable onPress={onClose}>
+              <Text style={[styles.iconBtnText, { color: UI.accent, marginTop: 10 }]}>Close</Text>
             </Pressable>
-            {page && (
-              <Pressable onPress={toggleEdit} hitSlop={10}>
-                <Text style={styles.headerButton}>{editing ? 'Done' : 'Edit'}</Text>
-              </Pressable>
-            )}
           </View>
-          {!page ? (
-            <View style={styles.missing}>
-              <Text style={{ color: UI.textMuted }}>This page no longer exists.</Text>
-            </View>
-          ) : (
-            <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+        ) : (
+          <>
+            <ScrollView style={styles.scroll} contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
               {editing ? <EditView page={page} allTags={allTags} /> : <ReadView page={page} />}
             </ScrollView>
-          )}
-        </View>
-      </KeyboardAvoidingView>
-    </View>
+            <View style={styles.bottomBar}>
+              <Pressable onPress={() => setArchived(page.id, !page.archived)} hitSlop={10} style={styles.iconBtn}>
+                <Text style={styles.iconBtnText}>{page.archived ? '📤' : '🗄'}</Text>
+              </Pressable>
+              <View style={{ flex: 1 }} />
+              <Pressable onPress={toggleEdit} hitSlop={10} style={styles.iconBtn}>
+                <Text style={styles.iconBtnText}>{editing ? '✓' : '✎'}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  (globalThis as any).document?.activeElement?.blur?.();
+                  onClose();
+                }}
+                hitSlop={10}
+                style={styles.iconBtn}
+              >
+                <Text style={styles.iconBtnText}>✕</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -108,27 +118,17 @@ function ReadView({ page }: { page: Page }) {
     <>
       <Text style={styles.title}>{page.title || 'Untitled'}</Text>
 
-      {page.archived ? (
+      {page.archived && (
         <View style={styles.archivedBanner}>
-          <Text style={styles.archivedText}>Archived</Text>
-          <Pressable onPress={() => setArchived(page.id, false)}>
-            <Text style={styles.link}>Restore</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <View style={styles.viewActions}>
-          <Pressable onPress={() => setArchived(page.id, true)}>
-            <Text style={styles.link}>Archive</Text>
-          </Pressable>
+          <Text style={styles.archivedText}>Archived — tap 📤 below to restore</Text>
         </View>
       )}
 
-      {/* Note reminders show the time up top; recurring lists show the schedule below the items. */}
       {page.type === 'note' && page.notifyEnabled && <Text style={styles.summary}>{summary(page)}</Text>}
 
       {showItems ? (
         <>
-          {page.items.length === 0 && <Text style={styles.hint}>No items. Tap Edit to add some.</Text>}
+          {page.items.length === 0 && <Text style={styles.hint}>No items. Tap ✎ to add some.</Text>}
           {page.items.map((item) => (
             <View key={item.id} style={styles.readItem}>
               <View style={styles.itemRow}>
@@ -148,7 +148,7 @@ function ReadView({ page }: { page: Page }) {
       ) : page.body !== '' ? (
         <RichHtml value={page.body} />
       ) : (
-        <Text style={styles.hint}>Empty note. Tap Edit to write something.</Text>
+        <Text style={styles.hint}>Empty note. Tap ✎ to write something.</Text>
       )}
 
       {page.type === 'reminderList' && <Text style={styles.summaryUnder}>{summary(page)}</Text>}
@@ -236,7 +236,7 @@ function EditView({ page, allTags }: { page: Page; allTags: string[] }) {
         <Text style={styles.checkbox}>☐</Text>
         <TextInput
           style={styles.itemInput}
-          placeholder="Add item"
+          placeholder="Type an item…"
           placeholderTextColor={UI.textMuted}
           value={newItem}
           onChangeText={setNewItem}
@@ -245,6 +245,9 @@ function EditView({ page, allTags }: { page: Page; allTags: string[] }) {
           returnKeyType="done"
         />
       </View>
+      <Pressable style={styles.addItemButton} onPress={submitNewItem}>
+        <Text style={styles.addItemButtonText}>＋ Add item</Text>
+      </Pressable>
     </>
   );
 
@@ -300,17 +303,17 @@ function EditView({ page, allTags }: { page: Page; allTags: string[] }) {
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Repeat</Text>
             <View style={styles.segment}>
-              {INTERVALS.map((i) => {
-                const active = page.reminder!.interval === i;
+              {INTERVALS.map((iv) => {
+                const active = page.reminder!.interval === iv;
                 return (
-                  <Pressable key={i} style={[styles.segmentButton, active && styles.segmentActive]} onPress={() => changeInterval(i)}>
-                    <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{i}</Text>
+                  <Pressable key={iv} style={[styles.segmentButton, active && styles.segmentActive]} onPress={() => changeInterval(iv)}>
+                    <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{iv}</Text>
                   </Pressable>
                 );
               })}
             </View>
-            {page.reminder.times.map((t, i) => (
-              <TimeRow key={i} interval={page.reminder!.interval} time={t} onChange={(next) => changeTime(i, next)} onRemove={() => changeTime(i, null)} />
+            {page.reminder.times.map((t, ti) => (
+              <TimeRow key={ti} interval={page.reminder!.interval} time={t} onChange={(next) => changeTime(ti, next)} onRemove={() => changeTime(ti, null)} />
             ))}
             <Pressable onPress={addTime}>
               <Text style={styles.addLink}>＋ Add time</Text>
@@ -335,20 +338,6 @@ function EditView({ page, allTags }: { page: Page; allTags: string[] }) {
         <Text style={styles.sectionLabel}>Color</Text>
         <ColorDots selected={page.color} onSelect={(c) => setColor(page.id, c)} />
       </View>
-
-      <Pressable
-        style={styles.deleteRow}
-        onPress={() =>
-          confirmAction(
-            page.archived ? 'Restore' : 'Archive',
-            page.archived ? 'Move back to your active pages?' : 'Move to the archive?',
-            page.archived ? 'Restore' : 'Archive',
-            () => setArchived(page.id, !page.archived)
-          )
-        }
-      >
-        <Text style={styles.link}>{page.archived ? 'Restore from archive' : 'Archive this page'}</Text>
-      </Pressable>
     </>
   );
 }
@@ -359,33 +348,38 @@ function DraftInput({ value, onCommit, style }: { value: string; onCommit: (t: s
     if (draft !== null) onCommit(draft);
     setDraft(null);
   };
-  return (
-    <TextInput style={style} value={draft ?? value} onChangeText={setDraft} onEndEditing={commit} onBlur={commit} multiline />
-  );
+  return <TextInput style={style} value={draft ?? value} onChangeText={setDraft} onEndEditing={commit} onBlur={commit} multiline />;
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center', padding: 16 },
   modalWrap: { width: '100%', maxWidth: 620, maxHeight: '90%' },
   modalCard: { borderRadius: 16, overflow: 'hidden', maxHeight: '100%' },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, paddingTop: 10 },
-  modalContent: { padding: 20, paddingTop: 8 },
+  scroll: { flexShrink: 1 },
+  modalContent: { padding: 20, paddingBottom: 12 },
+  bottomBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.15)',
+  },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' },
+  iconBtnText: { fontSize: 18, color: UI.text },
   missing: { padding: 40, alignItems: 'center' },
-  headerButton: { color: UI.accent, fontSize: 16, fontWeight: '600', paddingHorizontal: 12, paddingVertical: 4 },
   title: { fontSize: 24, fontWeight: '700', color: UI.text, marginBottom: 8 },
   titleInput: { fontSize: 22, fontWeight: '600', color: UI.text, paddingVertical: 6, marginBottom: 10 },
   editingLabel: { fontSize: 12, color: UI.textMuted, fontWeight: '600', textTransform: 'uppercase', marginBottom: 6 },
   summary: { fontSize: 13, color: UI.textMuted, marginBottom: 14 },
   summaryUnder: { fontSize: 13, color: UI.textMuted, marginTop: 16 },
-  viewActions: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8 },
-  archivedBanner: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: 10, marginBottom: 12 },
+  archivedBanner: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: 10, marginBottom: 12 },
   archivedText: { color: UI.text, fontWeight: '600' },
-  link: { color: UI.accent, fontWeight: '600', paddingVertical: 4 },
   readItem: { marginBottom: 10 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
-  checkbox: { fontSize: 20, color: UI.text },
-  itemText: { flex: 1, fontSize: 16, color: UI.text },
-  itemInput: { flex: 1, fontSize: 16, color: UI.text, paddingVertical: 6 },
+  checkbox: { fontSize: 24, color: UI.text },
+  itemText: { flex: 1, fontSize: 18, color: UI.text, fontWeight: '500' },
+  itemInput: { flex: 1, fontSize: 17, color: UI.text, paddingVertical: 6 },
   itemNoteBox: { marginLeft: 30, marginTop: 2 },
   itemNoteText: { fontSize: 13, color: UI.textMuted },
   checkedText: { textDecorationLine: 'line-through', color: UI.textMuted },
@@ -401,8 +395,9 @@ const styles = StyleSheet.create({
   itemHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   addRow: { borderWidth: 1, borderColor: UI.border, borderStyle: 'dashed', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   addLink: { color: UI.accent, fontWeight: '600', paddingVertical: 6 },
+  addItemButton: { marginTop: 8, borderWidth: 1, borderColor: UI.accent, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  addItemButtonText: { color: UI.accent, fontWeight: '700', fontSize: 15 },
   hint: { fontSize: 12, color: UI.textMuted },
   readTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 18 },
   readTag: { fontSize: 13, color: UI.textMuted },
-  deleteRow: { marginTop: 24, alignItems: 'center' },
 });
