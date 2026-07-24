@@ -116,7 +116,7 @@ export function RichHtmlEditor({
         onBlur={commit}
         data-ph={placeholder || ''}
         style={{
-          minHeight: 240,
+          minHeight: 56,
           border: `1px solid ${UI.border}`,
           borderRadius: 8,
           padding: 12,

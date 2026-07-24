@@ -130,6 +130,7 @@ export async function createPage(opts: {
   times?: ReminderTime[];
   items?: { text: string; note?: string }[];
   checklist?: boolean;
+  tags?: string[];
   sendEmail?: boolean;
   sendPush?: boolean;
 }): Promise<string> {
@@ -151,7 +152,7 @@ export async function createPage(opts: {
     type: opts.type,
     color: opts.color,
     position: opts.position,
-    tags: [],
+    tags: opts.tags ?? [],
     archived: false,
     archivedAt: null,
     body: isList || checklist ? '' : opts.body ?? '',

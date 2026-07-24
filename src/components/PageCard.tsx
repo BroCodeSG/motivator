@@ -65,10 +65,10 @@ export function PageCard({
       )}
 
       <View style={styles.actions}>
-        <Pressable hitSlop={8} onPress={onEdit} style={styles.actionBtn}>
+        <Pressable hitSlop={12} onPress={onEdit} style={styles.actionBtn}>
           <Text style={styles.actionIcon}>✎</Text>
         </Pressable>
-        <Pressable hitSlop={8} onPress={onDelete} style={styles.actionBtn}>
+        <Pressable hitSlop={12} onPress={onDelete} style={styles.actionBtn}>
           <Text style={styles.actionIcon}>🗑</Text>
         </Pressable>
       </View>
@@ -94,7 +94,13 @@ const styles = StyleSheet.create({
   badge: { fontSize: 12, color: UI.textMuted, marginTop: 8 },
   archivedTag: { fontSize: 11, color: UI.textMuted, marginTop: 4, fontStyle: 'italic' },
   tags: { fontSize: 11, color: UI.textMuted, marginTop: 4 },
-  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 14, marginTop: 8 },
-  actionBtn: { padding: 2 },
-  actionIcon: { fontSize: 15, color: UI.textMuted },
+  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 10 },
+  actionBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: UI.border,
+    borderRadius: 8,
+  },
+  actionIcon: { fontSize: 20, color: UI.text },
 });

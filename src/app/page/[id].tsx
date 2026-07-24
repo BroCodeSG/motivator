@@ -69,8 +69,11 @@ export default function PageDetailScreen() {
     setEditing((e) => !e);
   };
 
+  const webBlur: any =
+    Platform.OS === 'web' ? { backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' } : {};
+
   return (
-    <View style={styles.backdrop}>
+    <View style={[styles.backdrop, webBlur]}>
       <Pressable style={StyleSheet.absoluteFill} onPress={close} />
       <KeyboardAvoidingView style={styles.modalWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.modalCard, { backgroundColor: page ? pageColor(page.color) : UI.surface }]}>
@@ -362,7 +365,7 @@ function DraftInput({ value, onCommit, style }: { value: string; onCommit: (t: s
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center', padding: 16 },
   modalWrap: { width: '100%', maxWidth: 620, maxHeight: '90%' },
   modalCard: { borderRadius: 16, overflow: 'hidden', maxHeight: '100%' },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, paddingTop: 10 },

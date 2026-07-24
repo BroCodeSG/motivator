@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 15,
     color: UI.text,
-    minHeight: 200,
+    minHeight: 56,
     textAlignVertical: 'top',
     backgroundColor: 'rgba(0,0,0,0.15)',
   },

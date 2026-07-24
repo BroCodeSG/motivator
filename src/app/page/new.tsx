@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { ColorDots } from '@/components/ColorDots';
 import { OnceField, defaultOnceDate, toLocalIso } from '@/components/OnceField';
 import { RichHtmlEditor } from '@/components/RichHtmlEditor';
+import { TagEditor } from '@/components/TagEditor';
 import { TimeRow } from '@/components/TimeRow';
 import { Toggle } from '@/components/Toggle';
 import { createPage } from '@/lib/pages';
@@ -41,15 +42,18 @@ export default function NewPageScreen() {
   const [items, setItems] = useState<DraftItem[]>([{ id: newItemId(), text: '', note: '' }]);
   const [checklist, setChecklist] = useState(false); // note sub-style: tick-box note
   const [color, setColor] = useState(DEFAULT_COLOR);
+  const [tags, setTags] = useState<string[]>([]);
   const [sendPush, setSendPush] = useState(true);
   const [sendEmail, setSendEmail] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const isList = type === 'reminderList';
   const hasItems = isList || (type === 'note' && checklist);
+  const allTags = [...new Set(pages.flatMap((p) => p.tags))].sort();
+  const canCreate = title.trim().length > 0;
 
   const create = async () => {
-    if (saving) return;
+    if (saving || !canCreate) return;
     setSaving(true);
     const position = pages.reduce((max, p) => Math.max(max, p.position), 0) + 1;
     const id = await createPage({
@@ -57,6 +61,7 @@ export default function NewPageScreen() {
       type,
       color,
       position,
+      tags,
       checklist: type === 'note' ? checklist : undefined,
       body: hasItems ? undefined : body,
       notifyEnabled: isList ? undefined : notify,
@@ -126,8 +131,8 @@ export default function NewPageScreen() {
           </View>
 
           <TextInput
-            style={styles.titleInput}
-            placeholder="Title"
+            style={[styles.titleInput, !canCreate && styles.titleInputRequired]}
+            placeholder="Title (required)"
             placeholderTextColor={UI.textMuted}
             value={title}
             onChangeText={setTitle}
@@ -194,11 +199,18 @@ export default function NewPageScreen() {
             </>
           )}
 
+          <Text style={styles.label}>Tags</Text>
+          <TagEditor tags={tags} onChange={setTags} suggestions={allTags} />
+
           <Text style={styles.label}>Color</Text>
           <ColorDots selected={color} onSelect={setColor} />
 
-          <Pressable style={styles.createButton} onPress={create} disabled={saving}>
-            <Text style={styles.createText}>{saving ? 'Creating…' : 'Create'}</Text>
+          <Pressable
+            style={[styles.createButton, !canCreate && styles.createButtonDisabled]}
+            onPress={create}
+            disabled={saving || !canCreate}
+          >
+            <Text style={styles.createText}>{saving ? 'Creating…' : canCreate ? 'Create' : 'Enter a title to create'}</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -209,18 +221,20 @@ export default function NewPageScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: UI.background },
   content: { padding: 20, paddingBottom: 60, alignItems: 'center' },
-  card: { width: '100%', maxWidth: 560, gap: 8 },
+  card: { width: '100%', maxWidth: 560, gap: 14 },
   headerButton: { color: UI.accent, fontSize: 16, fontWeight: '600', paddingHorizontal: 14 },
   titleInput: {
     fontSize: 20,
     color: UI.text,
+    fontFamily: UI.font,
     borderBottomWidth: 1,
     borderBottomColor: UI.border,
     paddingVertical: 8,
-    marginVertical: 8,
+    marginVertical: 6,
   },
-  label: { fontSize: 13, color: UI.textMuted, marginTop: 12, fontWeight: '600', textTransform: 'uppercase' },
-  section: { marginTop: 14, gap: 6 },
+  titleInputRequired: { borderBottomColor: UI.danger },
+  label: { fontSize: 13, color: UI.textMuted, marginTop: 6, fontWeight: '600', textTransform: 'uppercase' },
+  section: { marginTop: 8, gap: 8 },
   segment: { flexDirection: 'row', gap: 8 },
   segmentButton: { flex: 1, borderWidth: 1, borderColor: UI.border, borderRadius: 8, padding: 12, alignItems: 'center' },
   segmentActive: { backgroundColor: 'rgba(138,180,248,0.15)', borderColor: UI.accent },
@@ -234,5 +248,6 @@ const styles = StyleSheet.create({
   addLink: { color: UI.accent, fontWeight: '600', paddingVertical: 8 },
   hint: { fontSize: 12, color: UI.textMuted },
   createButton: { marginTop: 24, backgroundColor: UI.accent, borderRadius: 10, padding: 14, alignItems: 'center' },
+  createButtonDisabled: { opacity: 0.5 },
   createText: { color: UI.onAccent, fontSize: 16, fontWeight: '600' },
 });

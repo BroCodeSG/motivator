@@ -27,4 +27,5 @@ export const UI = {
   accent: '#8ab4f8',
   onAccent: '#202124',
   danger: '#f28b82',
+  font: 'Arial, Helvetica, sans-serif',
 };

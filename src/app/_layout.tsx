@@ -8,6 +8,16 @@ import { PagesProvider, usePages } from '@/lib/pages-context';
 import { SessionProvider, useSession } from '@/lib/session-context';
 import { UI } from '@/theme';
 
+// Web: make the whole app use a clean sans-serif (Arial) instead of the
+// platform default. !important beats react-native-web's inline font-family.
+const _doc: any = (globalThis as any).document;
+if (_doc && !_doc.getElementById('tbka-font')) {
+  const st = _doc.createElement('style');
+  st.id = 'tbka-font';
+  st.textContent = `#root, #root * { font-family: ${UI.font} !important; }`;
+  _doc.head.appendChild(st);
+}
+
 // Keeps the notification schedule in sync with the data: runs on cold start,
 // on foreground, and on every Firestore snapshot (covers remote edits made
 // via scripts/manage.mjs while the app is open).
